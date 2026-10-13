@@ -188,7 +188,7 @@ public class LocalifyAndroidBridge {
                     if (tree == null) { finishCallback(callback, JSONObject.NULL, null); return; }
                     takePersistable(tree, data);
                     if ("chooseLibraryFolder".equals(action)) saveMusicFolder(tree.toString());
-                    JSONArray tracks = scanTree(tree, 0);
+                    JSONArray tracks = "chooseLibraryFolder".equals(action) ? scanTree(tree, 0, loadTrackCache()) : scanTree(tree, 0);
                     if ("chooseLibraryFolder".equals(action)) {
                         JSONObject result = new JSONObject(); put(result, "folder", tree.toString()); put(result, "folderAvailable", true);
                         try { result.put("tracks", tracks); result.put("discoveredPlaylists", new JSONArray()); } catch (Exception ignored) {}
@@ -232,7 +232,7 @@ public class LocalifyAndroidBridge {
         if (folder.isEmpty()) { finishCallback(callbackId, "null", null); return; }
         new Thread(() -> {
             try {
-                JSONArray tracks = scanTree(Uri.parse(folder), 0);
+                JSONArray tracks = scanTree(Uri.parse(folder), 0, loadTrackCache());
                 JSONObject result = new JSONObject(); put(result, "folder", folder); put(result, "folderAvailable", true);
                 try { result.put("tracks", tracks); result.put("discoveredPlaylists", new JSONArray()); } catch (Exception ignored) {}
                 finishCallback(callbackId, result.toString(), null);
@@ -243,16 +243,34 @@ public class LocalifyAndroidBridge {
         }, "LocalifyScanWorker").start();
     }
 
+    private Map<String, JSONObject> loadTrackCache() {
+        Map<String, JSONObject> cache = new HashMap<>();
+        JSONObject saved = readJsonFile("library.json", new JSONObject());
+        JSONArray tracks = saved.optJSONArray("library");
+        if (tracks == null) return cache;
+        for (int i = 0; i < tracks.length(); i++) {
+            JSONObject track = tracks.optJSONObject(i);
+            if (track == null) continue;
+            String path = track.optString("sourcePath", track.optString("path", ""));
+            if (!path.isEmpty()) cache.put(path, track);
+        }
+        return cache;
+    }
+
     private JSONArray scanTree(Uri treeUri, int depth) throws Exception {
+        return scanTree(treeUri, depth, null);
+    }
+
+    private JSONArray scanTree(Uri treeUri, int depth, Map<String, JSONObject> cachedTracks) throws Exception {
         JSONArray tracks = new JSONArray();
         if (depth > 10 || tracks.length() > 15000) return tracks;
         String treeId = DocumentsContract.getTreeDocumentId(treeUri);
         Uri rootDoc = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId);
-        scanDocument(treeUri, rootDoc, depth, tracks, new HashSet<String>());
+        scanDocument(treeUri, rootDoc, depth, tracks, new HashSet<String>(), cachedTracks);
         return tracks;
     }
 
-    private void scanDocument(Uri treeUri, Uri docUri, int depth, JSONArray out, Set<String> visited) {
+    private void scanDocument(Uri treeUri, Uri docUri, int depth, JSONArray out, Set<String> visited, Map<String, JSONObject> cachedTracks) {
         if (depth > 10 || out.length() >= 15000) return;
         String docId;
         try { docId = DocumentsContract.getDocumentId(docUri); } catch (Exception e) { return; }
@@ -263,27 +281,40 @@ public class LocalifyAndroidBridge {
                 String display = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
                 String mime = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
                 if (!DocumentsContract.Document.MIME_TYPE_DIR.equals(mime) && isAudio(display, mime)) {
-                    JSONObject track = makeTrack(docUri, display, cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED) >= 0 ? cursor.getLong(cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)) : 0);
+                    int modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
+                    long modified = modifiedIndex >= 0 ? cursor.getLong(modifiedIndex) : 0;
+                    JSONObject track = cachedTrack(docUri, display, modified, cachedTracks);
                     if (track != null) out.put(track);
                 }
             }
         } catch (Exception ignored) {}
         try {
             Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId);
-            try (Cursor cursor = resolver.query(children, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+            try (Cursor cursor = resolver.query(children, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_LAST_MODIFIED}, null, null, null)) {
                 if (cursor == null) return;
                 while (cursor.moveToNext() && out.length() < 15000) {
                     String childId = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID));
                     String display = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
                     String mime = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
                     Uri child = DocumentsContract.buildDocumentUriUsingTree(treeUri, childId);
-                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) scanDocument(treeUri, child, depth + 1, out, visited);
+                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) scanDocument(treeUri, child, depth + 1, out, visited, cachedTracks);
                     else if (isAudio(display, mime)) {
-                        JSONObject track = makeTrack(child, display, 0); if (track != null) out.put(track);
+                        int modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
+                        long modified = modifiedIndex >= 0 ? cursor.getLong(modifiedIndex) : 0;
+                        JSONObject track = cachedTrack(child, display, modified, cachedTracks);
+                        if (track != null) out.put(track);
                     }
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    private JSONObject cachedTrack(Uri uri, String display, long modified, Map<String, JSONObject> cachedTracks) {
+        JSONObject cached = cachedTracks == null ? null : cachedTracks.get(uri.toString());
+        if (cached != null && modified > 0 && Long.toString(modified).equals(cached.optString("_statKey", ""))) {
+            try { return new JSONObject(cached.toString()); } catch (Exception ignored) {}
+        }
+        return makeTrack(uri, display, modified);
     }
 
     private boolean isAudio(String name, String mime) {
