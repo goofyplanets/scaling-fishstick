@@ -462,12 +462,9 @@ public class LocalifyAndroidBridge {
     }
     private String sniffImage(byte[] b) { if (b.length > 4 && b[0] == (byte)0x89 && b[1] == 'P') return "image/png"; if (b.length > 2 && b[0] == (byte)0xff && b[1] == (byte)0xd8) return "image/jpeg"; return "image/jpeg"; }
 
-    @JavascriptInterface public String onlineSearch(String payload) {
-        JSONObject data = parseObject(payload); String query = data.optString("query", "").trim();
-        int limit = Math.max(1, Math.min(50, data.optInt("limit", 18)));
-        try { return itunesSearch(query, limit).toString(); }
-        catch (Exception e) { Log.w(TAG, "Online search failed", e); return "[]"; }
-    }
+    // Online result search is handled asynchronously by searchYtDlp().
+    // This legacy synchronous endpoint intentionally returns no Apple preview rows.
+    @JavascriptInterface public String onlineSearch(String payload) { return "[]"; }
 
     @JavascriptInterface public String metadataSearch(String rawTrack) {
         JSONObject track = parseObject(rawTrack);
@@ -487,6 +484,33 @@ public class LocalifyAndroidBridge {
             put(out, "sourceUrl", best.optString("sourceUrl", "")); put(out, "metadataCheckedAt", System.currentTimeMillis());
             return out.toString();
         } catch (Exception e) { return "null"; }
+    }
+
+    // iTunes lookup remains available only to local-file metadata enrichment
+    // (titles/artwork); it is not used to populate the online-search result list.
+    private JSONArray itunesSearch(String query, int limit) throws Exception {
+        JSONArray out = new JSONArray(); if (query == null || query.trim().isEmpty()) return out;
+        String endpoint = "https://itunes.apple.com/search?media=music&entity=song&limit=" + limit + "&term=" + URLEncoder.encode(query, "UTF-8");
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+        connection.setConnectTimeout(4500); connection.setReadTimeout(5500); connection.setRequestProperty("User-Agent", "LocalifyCrimson-Android/1.2.1");
+        try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192]; int n; while ((n = input.read(buffer)) >= 0) output.write(buffer, 0, n);
+            JSONObject root = new JSONObject(output.toString("UTF-8")); JSONArray rows = root.optJSONArray("results"); if (rows == null) return out;
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject r = rows.getJSONObject(i); String preview = r.optString("previewUrl", "");
+                JSONObject track = new JSONObject(); String trackId = r.optString("trackId", "remote-" + i);
+                put(track, "id", "remote:itunes:" + trackId); put(track, "provider", "itunes"); put(track, "providerId", trackId);
+                put(track, "title", r.optString("trackName", "Без названия")); put(track, "artist", r.optString("artistName", ""));
+                put(track, "album", r.optString("collectionName", "")); put(track, "duration", r.optLong("trackTimeMillis", 0) / 1000.0);
+                put(track, "year", r.optString("releaseDate", "").length() >= 4 ? r.optString("releaseDate").substring(0, 4) : "");
+                put(track, "genre", r.optString("primaryGenreName", ""));
+                String artwork = r.optString("artworkUrl100", "").replace("100x100bb", "600x600bb");
+                put(track, "cover", artwork); put(track, "remoteCover", artwork); put(track, "sourceUrl", r.optString("trackViewUrl", ""));
+                if (!preview.isEmpty()) { put(track, "streamUrl", preview); put(track, "url", preview); }
+                put(track, "downloadAllowed", false); out.put(track);
+            }
+        } finally { connection.disconnect(); }
+        return out;
     }
 
     @JavascriptInterface public boolean openExternal(String rawUrl) {
