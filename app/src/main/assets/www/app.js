@@ -1528,7 +1528,10 @@ async function syncConfiguredLibrary(notify = true, change = null) {
       if (notify) renderAll();
     }
   }
-  catch (err) { console.error('Library sync failed:', err); if (notify) toast('Не удалось обновить библиотеку'); }
+  catch (err) {
+    console.error('Library sync failed:', err);
+    if (notify || window.__LOCALIFY_ANDROID__) toast(String(err?.message || 'Не удалось обновить библиотеку'));
+  }
   finally { state.syncingLibrary = false; if (!state.scanProgress) updateLibraryScanProgress({ phase: 'done', done: state.library.length, total: state.library.length }); }
 }
 async function refreshTrackMetadata(id) {
