@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('localify', {
   getPathForFile: (file) => { try { return webUtils.getPathForFile(file); } catch { return file?.path || ''; } },
   pickFolder: () => ipcRenderer.invoke('dialog:folder'),
   chooseLibraryFolder: () => ipcRenderer.invoke('library:chooseFolder'),
+  chooseDownloadFolder: () => ipcRenderer.invoke('downloads:chooseFolder'),
   scanLibraryFolder: (options = {}) => ipcRenderer.invoke('library:scanFolder', options),
   scanLibraryChange: (payload) => ipcRenderer.invoke('library:scanChange', payload),
   scanLibraryChanges: (payload) => ipcRenderer.invoke('library:scanChanges', payload),
