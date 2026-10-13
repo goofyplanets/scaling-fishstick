@@ -88,6 +88,8 @@ public class LocalifyAndroidBridge {
         Iterator<String> keys = defaults.keys();
         while (keys.hasNext()) { String key = keys.next(); if (!saved.has(key)) try { saved.put(key, defaults.get(key)); } catch (Exception ignored) {} }
         // Windows-only file-moving/tray behavior is deliberately disabled on Android.
+        String savedDownloadFolder = saved.optString("downloadFolder", "").trim();
+        put(saved, "downloadFolderLabel", savedDownloadFolder.isEmpty() ? "" : downloadFolderDisplayName(Uri.parse(savedDownloadFolder)));
         put(saved, "closeToTray", false); put(saved, "startMinimized", false); put(saved, "trayEnabled", false);
         put(saved, "minimizeToTray", false); put(saved, "moveFilesIntoPlaylists", false);
         put(saved, "autoWatch", false);
@@ -784,7 +786,7 @@ public class LocalifyAndroidBridge {
         } else if (Build.VERSION.SDK_INT >= 29) {
             ContentValues values = new ContentValues();
             values.put(MediaStore.Audio.Media.DISPLAY_NAME, name);
-            values.put(MediaStore.Audio.Media.MIME_TYPE, extension.equals("mp3") ? "audio/mpeg" : extension.equals("m4a") ? "audio/mp4" : extension.equals("aac") ? "audio/aac" : "audio/*");
+            values.put(MediaStore.Audio.Media.MIME_TYPE, extension.equals("mp3") ? "audio/mpeg" : extension.equals("m4a") ? "audio/mp4" : extension.equals("aac") ? "audio/aac" : extension.equals("opus") || extension.equals("ogg") ? "audio/ogg" : extension.equals("webm") ? "audio/webm" : "audio/*");
             values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/Localify Downloads");
             values.put(MediaStore.Audio.Media.IS_PENDING, 1);
             resultUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
