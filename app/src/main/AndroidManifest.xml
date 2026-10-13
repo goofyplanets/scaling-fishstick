@@ -9,8 +9,8 @@
         android:allowBackup="true"
         android:extractNativeLibs="true"
         android:label="Localify Crimson"
-        android:icon="@drawable/localify_icon"
-        android:roundIcon="@drawable/localify_icon"
+        android:icon="@mipmap/localify_icon"
+        android:roundIcon="@mipmap/localify_icon"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
         <activity
