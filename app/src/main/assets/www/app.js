@@ -1813,9 +1813,12 @@ async function runOnlineSearch(query=state.search, openView=true){
   finally{ if(token===state.onlineSearchToken){ state.onlineSearchLoading=false; renderOnlineSearch(); } }
 }
 function prewarmOnlinePlayback(results){
-  if (!window.__LOCALIFY_ANDROID__ || !Array.isArray(results)) return;
-  // Resolve the first two hits in the background so tapping Play avoids the initial format lookup.
-  results.slice(0, 2).forEach(track => {
+  if (!Array.isArray(results)) return;
+  // Resolve the first result on desktop and the first two on Android in the background.
+  // The player shares in-flight jobs and a bounded cache, so tapping Play avoids
+  // the initial yt-dlp format lookup without spawning duplicate resolver processes.
+  const warmCount = window.__LOCALIFY_ANDROID__ ? 2 : 1;
+  results.slice(0, warmCount).forEach(track => {
     if (track?.provider === 'youtube' && !track.streamUrl) void ensureRemoteStream(track, true).catch(() => {});
   });
 }
