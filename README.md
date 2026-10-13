@@ -1,2 +1,66 @@
-# scaling-fishstick
-local player
+# Localify Crimson — Android port (preview)
+
+Android-проект, который переносит интерфейс Localify Crimson 1.1.1 в Android WebView и заменяет Electron IPC нативным слоем Android. Исходный desktop-проект из архива не изменён; все Android-изменения находятся в этой папке.
+
+## Сборка APK
+
+**Требования:** Android Studio актуальной версии, JDK 17 (обычно поставляется с Android Studio), подключение к интернету для загрузки Android Gradle Plugin/Gradle и Android SDK Platform 35.
+
+1. Распакуйте архив проекта в отдельную папку.
+2. Откройте папку `LocalifyCrimson-Android` в Android Studio через **File → Open**.
+3. Дождитесь Gradle Sync и установки Android SDK Platform 35, если Android Studio предложит её установить.
+4. Выберите **Build → Build Bundle(s) / APK(s) → Build APK(s)**.
+5. Debug APK будет в `app/build/outputs/apk/debug/app-debug.apk`.
+
+Из командной строки (из корневой папки проекта):
+
+- Windows: `gradlew.bat :app:assembleDebug`
+- Linux/macOS: `./gradlew :app:assembleDebug`
+
+В проект включён небольшой bootstrap-скрипт Gradle: при первом запуске он загружает официальный Gradle 8.9 в пользовательский кэш. Android Gradle Plugin и SDK должны быть доступны через интернет/Android Studio.
+
+## Что уже перенесено
+
+- Оригинальный crimson-интерфейс и основная структура UI Localify Crimson.
+- Локальная библиотека и настройки с сохранением между запусками.
+- Выбор нескольких аудиофайлов и выбор музыкальной папки через Android Storage Access Framework.
+- Сканирование выбранной папки, чтение базовых тегов и встроенных обложек из аудиофайлов.
+- Воспроизведение локальных файлов через WebView-адаптер `https://localify.media/...` с обработкой Range-запросов для перемотки.
+- Виртуальные плейлисты, очередь, история, поиск по локальной библиотеке, сортировка, перемешивание и повтор — через исходный JavaScript-интерфейс.
+- Хранение сессии воспроизведения, настройки и JSON библиотеки в приватном каталоге приложения.
+- Фоновый playback-service и уведомление с кнопками предыдущий/пауза/следующий и MediaSession.
+- Онлайн-поиск через iTunes Search API с воспроизведением доступных preview-фрагментов и использование обложек из каталога для обогащения тегов.
+- Системное открытие исходной страницы онлайн-результата.
+
+## Известные ограничения этого Android-порта
+
+- Это первая интеграционная сборка. Исходные Electron-функции требуют адаптации, и не все из них имеют прямой Android-эквивалент.
+- Загрузка полноценных треков с YouTube через `yt-dlp`, работа с `FFmpeg`, браузерными cookies и разрешение YouTube-потоков не включены: desktop-проект использует процессы и бинарные файлы Windows, которые не запускаются в Android. Онлайн-поиск Android-версии показывает доступные музыкальные preview-фрагменты.
+- Плейлисты виртуальные: перенос/удаление исходных файлов отключены намеренно, чтобы не менять файлы пользователя без Android-реализации безопасных операций.
+- Автоматический файловый watcher заменён сканированием выбранной папки вручную/при запуске. Постоянный мониторинг изменений дерева SAF пока не реализован.
+- Поиск дополнительных метаданных на Android использует iTunes Search API; провайдеры MusicBrainz/Deezer и desktop-кэш/диагностика ещё не перенесены полностью.
+- Нативная фоновая сессия и уведомление добавлены, но управление аудиофокусом, Bluetooth-гарнитурой и тестирование на физических устройствах нужно проверить отдельно.
+
+## Структура
+
+- `app/src/main/assets/www/` — исходный веб-интерфейс и Android JS-адаптер.
+- `app/src/main/java/com/localify/crimson/MainActivity.java` — WebView и bridge activity.
+- `app/src/main/java/com/localify/crimson/LocalifyAndroidBridge.java` — файловая система Android, сохранение, метаданные и онлайн-поиск.
+- `app/src/main/java/com/localify/crimson/PlaybackService.java` — foreground playback service / media session.
+
+## Идентификатор и версия
+
+- Application ID: `com.localify.crimson`
+- Версия: `1.1.1-android-preview`
+- Минимальная версия Android: 8.0 (API 26)
+
+## Получить APK через облачную сборку (без Android SDK на своём ПК)
+
+В репозитории включён workflow GitHub Actions `.github/workflows/android-apk.yml`, который запускает сборку и прикладывает `app-debug.apk` как artifact.
+
+1. Создайте пустой репозиторий на GitHub и загрузите в него содержимое этой папки (включая каталог `.github`).
+2. Откройте вкладку **Actions** и выберите workflow **Build Android APK**. Нажмите **Run workflow** (если workflow ещё не запускался, GitHub может сначала попросить включить Actions).
+3. Дождитесь завершения job со статусом зелёной галочки, откройте завершённый запуск и скачайте artifact **localify-crimson-debug-apk**.
+4. Распакуйте скачанный artifact на телефоне и откройте `app-debug.apk`. Android может попросить разрешить установку из данного источника.
+
+Это debug-сборка для тестирования, не опубликованная и не проверенная Google Play-сборка. Перед использованием необходимо протестировать её на устройстве. Облачная сборка требует аккаунта GitHub и успешного запуска workflow.

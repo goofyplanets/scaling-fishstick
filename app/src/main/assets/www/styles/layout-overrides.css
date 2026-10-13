@@ -1,0 +1,480 @@
+/* Shared player/layout sizing. Right-side Now Playing panel was removed in v3.
+   Высота нижней панели задаётся ТОЛЬКО переменной --player-h: от неё же считается
+   высота .app-shell, поэтому список и панель всегда стыкуются. Жёсткие height в
+   features.css/interaction.css задают внутреннюю сетку, но не размер панели —
+   иначе на узких окнах панель уезжала за край (проверяется в npm run smoke). */
+:root{--windowbar-h:34px;--player-h:104px}
+.app-shell{height:calc(100vh - var(--windowbar-h) - var(--player-h));min-height:0}
+.main{min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:24px}
+.player{height:var(--player-h)!important;min-height:var(--player-h)!important}
+.track,.track-header{contain:layout paint}
+.track-copy,.track-title,.track-album,.track-added,.track-actions{min-width:0}
+.track-title b,.track-title small,.track-album,.track-added{max-width:100%}
+/* Ниже 1080px панель раскладывается в две строки — ей нужны 116px.
+   Короткие окна уменьшают панель только там, где раскладка однострочная. */
+@media(max-width:1080px){:root{--player-h:116px}.app-shell{height:calc(100vh - var(--windowbar-h) - var(--player-h))}}
+@media(max-width:820px){:root{--player-h:122px}.app-shell{height:calc(100vh - var(--windowbar-h) - var(--player-h))}}
+@media(max-width:640px){:root{--player-h:126px}.app-shell{height:calc(100vh - var(--windowbar-h) - var(--player-h))}}
+@media(max-width:720px){.sidebar{display:none}.app-shell{grid-template-columns:1fr}}
+@media(max-height:720px) and (min-width:1081px){:root{--player-h:92px}.app-shell{height:calc(100vh - var(--windowbar-h) - var(--player-h))}}
+@media(max-height:620px){.app-shell{height:calc(100vh - var(--windowbar-h) - var(--player-h))}}
+
+
+/* Green audio visualizer — deliberately sits behind the entire main content. */
+.main{position:relative;isolation:isolate;background:rgba(0,0,0,.82)!important;}
+.audio-visualizer{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.95;}
+.main>.topbar,.main>.view{position:relative;z-index:1;}
+.main>.topbar{background:rgba(0,0,0,.72)!important;}
+.main>.view{background:transparent;}
+.track-header{background:rgba(7,3,4,.70)!important;backdrop-filter:blur(4px)!important;}
+.track{background:rgba(0,0,0,.12);}
+.track:hover{background:rgba(30,21,22,.56)!important;}
+.toolbar{background:rgba(0,0,0,.16);}
+.music-card,.settings-card,.hero{background:rgba(8,5,6,.80)!important;}
+@media(prefers-reduced-motion:reduce){.audio-visualizer{opacity:.65;}}
+
+
+/* Screenshot-inspired neon green music library skin. */
+:root{--accent:#e01f2c;--accent-soft:rgba(224,31,44,.13);--accent-strong:#ff8d9a;--line:#2b2022;--muted:#788078;--text:#f5eced}
+body{background:#080304;color:var(--text)}
+.windowbar{background:#0e0407;border-bottom-color:rgba(145,69,77,.22)}
+.window-title{color:#e8d8da;letter-spacing:.16em;font-size:11px}
+.brand-name{letter-spacing:.22em;color:#f0e4e5}
+.app-shell{background:#080304}
+.sidebar{background:linear-gradient(180deg,#0b0306,#060203 72%);border-right:1px solid rgba(153,79,87,.18)}
+.nav-item.active{background:rgba(224,31,44,.10);color:#f6d4d7;box-shadow:inset 2px 0 0 var(--accent)}
+.nav-item:hover,.playlist-list button:hover{background:rgba(224,31,44,.07)}
+.side-heading{color:#98898b}
+.side-heading-actions button{color:var(--accent)}
+.storage-card{background:rgba(11,5,7,.72);border-color:rgba(153,79,87,.18)}
+.progress{background:#201819}.progress span{background:var(--accent);box-shadow:0 0 10px rgba(224,31,44,.55)}
+.main{position:relative;isolation:isolate;background:rgba(5,2,3,.76)!important}
+.audio-visualizer{position:absolute;inset:0;z-index:0;opacity:.82;mix-blend-mode:screen;pointer-events:none}
+.main>.topbar,.main>.view{position:relative;z-index:1}
+.topbar{height:74px;background:rgba(6,2,4,.68)!important;border-bottom-color:rgba(138,67,75,.18);backdrop-filter:blur(10px)}
+.search{background:rgba(9,4,6,.84);border-color:rgba(150,78,86,.16);box-shadow:inset 0 0 0 1px rgba(224,31,44,.02)}
+.search:focus-within{border-color:rgba(224,31,44,.42);box-shadow:0 0 0 3px rgba(224,31,44,.07)}
+.search input{color:#f8ebec}.search-mode-btn.active{background:rgba(224,31,44,.09);color:var(--accent);border-color:rgba(224,31,44,.2)}
+.library-top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+.top-action{border:1px solid rgba(139,76,83,.26);background:rgba(14,6,9,.78);color:#c5b5b7;border-radius:8px;padding:10px 15px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px}
+.top-action:hover{border-color:rgba(224,31,44,.42);color:#ffe9eb;background:rgba(224,31,44,.07)}
+/* Правило .top-action span{font-size:18px} раньше увеличивало подпись «Добавить»
+   (единственная кнопка с обёрткой в span) и ломало единый вид панели. */
+.view{padding:28px 30px}.page-head{margin-bottom:12px}.page-head h1{font-size:40px}.eyebrow{color:#8a7376}
+.page-actions .primary,.primary{background:var(--accent);color:#140205;box-shadow:0 0 18px rgba(224,31,44,.12)}
+.secondary{background:rgba(14,6,9,.78);border-color:rgba(139,76,83,.25)}
+.toolbar{background:rgba(6,2,4,.25);border-bottom-color:rgba(133,74,81,.22);height:38px}
+.track-table{margin-top:2px}.track-header{background:rgba(8,4,6,.70)!important;border-bottom-color:rgba(146,76,84,.22)!important}
+.track{grid-template-columns:30px minmax(260px,1.5fr) minmax(150px,.8fr) 100px 70px 118px;min-height:54px;padding:7px 8px;border-bottom-color:rgba(108,65,70,.18);background:rgba(0,0,0,.22)}
+.track:hover{background:rgba(35,12,16,.54)!important}.track.is-playing{background:rgba(70,14,22,.28)!important;box-shadow:inset 2px 0 0 var(--accent)}
+.row-cover{width:42px;height:42px;border-radius:5px;background:#170b0e;border:1px solid rgba(148,80,87,.16)}
+.track-title{gap:10px}.track-title b{font-size:13px}.track-title small,.track-album,.track-added{color:#817779;font-size:11px}.track-actions{display:flex;justify-content:flex-end;align-items:center;gap:2px}.track-actions button{width:28px;height:28px;border-radius:5px}.track-actions button:hover{background:rgba(224,31,44,.08);color:var(--accent)}
+.track-head-btn{color:#807173}.track-head-btn.active{color:var(--accent)}
+.playing-eq i{background:var(--accent);box-shadow:0 0 5px rgba(224,31,44,.6)}
+.genre-list{display:grid;gap:2px}.genre-item{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:7px;border:0;background:transparent;color:#a69a9c;text-align:left;padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12px}.genre-item:hover{background:rgba(224,31,44,.06);color:#e8d4d6}.genre-item.active{background:rgba(224,31,44,.08);color:var(--accent);box-shadow:inset 2px 0 0 var(--accent)}.genre-icon{font-size:16px;line-height:1;color:#805f63}.genre-item.active .genre-icon{color:var(--accent)}.genre-count{color:#605052;font-size:10px}
+.music-card,.settings-card,.hero{background:rgba(8,4,6,.78)!important;border-color:rgba(121,67,73,.22)!important}.music-card:hover{background:rgba(24,9,12,.82)!important}.hero:after{background:rgba(224,31,44,.07)}.hero h1 span{color:var(--accent)}
+.player{background:rgba(8,4,6,.94);border-top-color:rgba(149,77,85,.26);box-shadow:0 -8px 30px rgba(0,0,0,.28)}
+.mini-cover{background:#150a0d;border:1px solid rgba(143,76,83,.2)}.play{width:42px;height:42px;background:#ffeef1;color:#140205;box-shadow:0 0 18px rgba(224,31,44,.16)}.control:hover,.player-tool:hover,.like:hover{color:var(--accent)}
+.seek input,.right-controls input{accent-color:var(--accent)}
+.seek input{height:4px}.right-controls input{width:130px;min-width:110px}
+.mode-pill{border-color:rgba(143,76,83,.25);color:#847779}
+.empty{border-color:rgba(143,76,83,.25);background:rgba(8,4,6,.36)}
+.file-drop-active{outline:1px dashed var(--accent);outline-offset:-6px;background:rgba(224,31,44,.03)!important}
+@media(max-width:1100px){.library-top-actions{display:none}.track{grid-template-columns:28px minmax(210px,1fr) minmax(120px,.7fr) 70px 65px 96px}}
+@media(max-width:780px){.view{padding:20px 14px}.track{grid-template-columns:28px minmax(180px,1fr) 60px 96px}.track-album,.track-added{display:none}.track-header .track-head-btn:nth-of-type(2),.track-header .track-head-btn:nth-of-type(3){display:none}}
+
+/* Единственный акцент — зелёный: переключателя акцентов нет. */
+:root {
+  --accent:#e01f2c;
+  --accent-soft:rgba(224,31,44,.13);
+  --accent-strong:#ff8d9a;
+  --accent-glow:rgba(224,31,44,.25);
+}
+
+/* Green scrollbars everywhere, including the sidebar and library scroller. */
+* { scrollbar-color: rgba(224,31,44,.72) #120a0b; }
+*::-webkit-scrollbar { width:10px; height:10px; }
+*::-webkit-scrollbar-track { background:#100809; border-radius:999px; }
+*::-webkit-scrollbar-thumb { background:linear-gradient(180deg,#ff8d9a,#c92b3a); border:2px solid #100809; border-radius:999px; }
+*::-webkit-scrollbar-thumb:hover { background:linear-gradient(180deg,#ff929b,#e01f2c); }
+
+/* Localify branding restored. */
+.window-title { color:#f7d7db; }
+.window-title-sub { color:#887275; margin-left:5px; letter-spacing:.1em; }
+.brand-copy { min-width:0; display:flex; flex-direction:column; line-height:1; }
+.brand-name { color:#ffdfe2; }
+.brand-subtitle { margin-top:4px; color:#826c6f; font-size:8px; letter-spacing:.24em; font-weight:800; }
+.brand-mark img { filter: drop-shadow(0 0 7px rgba(224,31,44,.22)); }
+
+/* Volume: compact, green, and close to the screenshot layout. */
+.volume-control { display:flex; align-items:center; gap:8px; min-width:0; }
+.volume-range { width:92px !important; min-width:92px !important; height:5px !important; }
+.volume-percent { min-width:31px; color:#b2a4a6; font-size:10px; font-variant-numeric:tabular-nums; text-align:right; }
+.right-controls { gap:7px; }
+.right-controls .player-tool { width:30px; height:30px; }
+.right-controls .player-tool:hover { color:var(--accent); background:var(--accent-soft); }
+
+@media(max-width:880px){
+  .volume-control { gap:6px; }
+  .volume-range { width:76px !important; min-width:76px !important; }
+}
+
+/* Sidebar v1.5 — clean compact navigation matching the reference. */
+.sidebar{
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:#d52d3c #0e0407;
+}
+.sidebar::-webkit-scrollbar{width:7px}
+.sidebar::-webkit-scrollbar-track{background:#0e0407}
+.sidebar::-webkit-scrollbar-thumb{background:#d52d3c;border-radius:999px;border:1px solid #0e0407}
+.brand{min-height:58px;align-items:center}
+.brand-copy{min-width:0}
+.brand-name{white-space:nowrap}
+.brand-subtitle{display:none!important}
+.nav-item .nav-icon{width:21px;height:21px;flex:0 0 21px;display:block}
+
+/* Collapsed state: only centered icons, no clipped labels. */
+body.sidebar-collapsed .sidebar{width:78px;padding:10px 9px 12px}
+body.sidebar-collapsed .brand{height:58px;min-height:58px;padding:0;justify-content:center;align-items:center}
+body.sidebar-collapsed .brand .brand-mark,
+body.sidebar-collapsed .brand .brand-copy{display:none}
+body.sidebar-collapsed .sidebar-toggle{margin:0 auto;width:46px;height:46px;flex:0 0 46px;border-radius:13px;color:#bfaaac}
+body.sidebar-collapsed .sidebar-toggle:hover{color:var(--accent);border-color:rgba(224,31,44,.45);background:rgba(224,31,44,.07)}
+body.sidebar-collapsed .nav{margin-top:4px;gap:8px}
+body.sidebar-collapsed .nav-item{width:52px;height:48px;min-height:48px;margin:0 auto;padding:0;display:grid;place-items:center;justify-content:center;gap:0;border-radius:10px;font-size:0;line-height:0}
+body.sidebar-collapsed .nav-item .nav-icon{width:21px;height:21px;margin:0}
+body.sidebar-collapsed .nav-item.active{box-shadow:none;background:rgba(224,31,44,.11);outline:1px solid rgba(224,31,44,.12)}
+body.sidebar-collapsed .nav-item:not(.active):hover{background:rgba(224,31,44,.06)}
+body.sidebar-collapsed .genre-section,
+body.sidebar-collapsed .sidebar-bottom,
+body.sidebar-collapsed .side-section:not(.genre-section){display:none}
+body.sidebar-collapsed .sidebar-toggle svg{width:23px;height:23px}
+
+/* Expanded state: keep the reference's dense, green-accented left rail. */
+body:not(.sidebar-collapsed) .sidebar{width:220px}
+body:not(.sidebar-collapsed) .brand{padding-left:8px;padding-right:4px}
+body:not(.sidebar-collapsed) .brand-mark{width:32px;height:32px}
+body:not(.sidebar-collapsed) .nav{gap:4px}
+body:not(.sidebar-collapsed) .nav-item{min-height:42px}
+
+/* Genre rows are real filters; make their active state obvious. */
+.genre-item{min-width:0}
+.genre-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.genre-count{font-variant-numeric:tabular-nums}
+
+/* Make the player volume resemble the reference: short green bar + percentage. */
+.volume-control{display:flex;align-items:center;gap:7px;min-width:0}
+.volume-range{width:92px!important;height:4px!important}
+.volume-percent{width:30px;text-align:right;color:#b1a8aa;font-size:10px;font-variant-numeric:tabular-nums;line-height:1}
+
+@media(max-width:860px){
+  body:not(.sidebar-collapsed) .sidebar{width:205px}
+}
+
+/* Radio + collapsible genres + reliable inline navigation icons */
+.nav-item .nav-icon{color:var(--accent);filter:drop-shadow(0 0 5px rgba(224,31,44,.18));}
+.nav-item .nav-icon svg{width:21px;height:21px;display:block;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+.nav-item .gear-icon svg,.nav-item .radio-icon svg{overflow:visible}
+.nav-item .gear-icon,.nav-item .radio-icon{display:grid;place-items:center;width:21px;height:21px;flex:0 0 21px;color:var(--accent)}
+.section-toggle{width:24px!important;height:24px!important;padding:0!important;border:0!important;background:transparent!important;color:#816f71!important;border-radius:6px!important;display:grid;place-items:center;font-size:15px;line-height:1;cursor:pointer;transition:transform .16s ease,color .16s ease,background .16s ease}
+.section-toggle:hover{color:var(--accent)!important;background:rgba(224,31,44,.07)!important}
+.genre-section.genre-collapsed .genre-list{display:none}
+.genre-section.genre-collapsed .section-toggle{transform:rotate(180deg);color:var(--accent)!important}
+.genre-section.genre-collapsed .side-heading{padding-bottom:2px}
+
+.radio-head{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:18px}
+.radio-head h1{margin:8px 0 8px;font-size:44px;line-height:1;letter-spacing:-.04em}
+.radio-head p{margin:0;color:var(--text-body);max-width:620px}
+.radio-search{display:flex;gap:8px;align-items:center;min-width:min(440px,42vw)}
+.radio-search input{height:44px;min-width:0;flex:1;border:1px solid rgba(150,78,86,.18);border-radius:22px;background:rgba(9,4,6,.86);color:#f8ebec;padding:0 16px;outline:0}
+.radio-search input:focus{border-color:rgba(224,31,44,.42);box-shadow:0 0 0 3px rgba(224,31,44,.07)}
+.radio-search .primary{height:44px;border-radius:22px;padding:0 18px}
+.radio-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;color:#908082;font-size:12px}
+.radio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.radio-card{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px;border:1px solid rgba(121,67,73,.22);border-radius:12px;background:rgba(8,4,6,.72);min-width:0;transition:background .15s,border-color .15s,transform .15s}
+.radio-card:hover{background:rgba(24,9,12,.82);border-color:rgba(224,31,44,.24);transform:translateY(-1px)}
+.radio-logo{width:56px;height:56px;border-radius:10px;overflow:hidden;display:grid;place-items:center;background:#110b0c;color:var(--accent);border:1px solid rgba(121,67,73,.18);font-weight:900;font-size:20px}
+.radio-logo img{width:100%;height:100%;object-fit:cover}
+.radio-copy{min-width:0}
+.radio-copy b,.radio-copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radio-copy b{font-size:13px;color:#f0e4e5}.radio-copy small{margin-top:4px;color:#837476;font-size:10px}
+.radio-tags{margin-top:5px;color:#605052;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radio-play{width:38px;height:38px;border:0;border-radius:50%;background:var(--accent);color:#0f0809;display:grid;place-items:center;cursor:pointer;font-weight:900;flex:0 0 auto}
+.radio-play svg{width:17px;height:17px;fill:currentColor}
+.radio-card.playing{border-color:rgba(224,31,44,.52);box-shadow:inset 2px 0 0 var(--accent),0 0 0 1px rgba(224,31,44,.04)}
+.radio-empty{grid-column:1/-1;padding:48px 20px;text-align:center;border:1px dashed rgba(121,67,73,.25);border-radius:12px;color:#706264}
+@media(max-width:900px){.radio-head{display:block}.radio-search{margin-top:16px;min-width:0;width:100%}.radio-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}
+@media(max-width:640px){.radio-grid{grid-template-columns:1fr}.radio-head h1{font-size:36px}}
+
+/* Final icon polish: keep the settings cog fully inside its 21px box. */
+.nav-item{overflow:visible}
+.nav-item .gear-icon{overflow:visible}
+.nav-item .gear-icon svg{width:20px;height:20px;overflow:visible;transform:scale(.94);transform-origin:center}
+
+/* Local radio/discovery cards */
+.radio-toolbar-actions{display:flex;align-items:center;gap:8px}
+.radio-toolbar-actions .primary,.radio-toolbar-actions .secondary{padding:8px 13px;border-radius:18px}
+.radio-play:disabled{opacity:.45;cursor:default}
+.radio-logo img{width:100%;height:100%;object-fit:cover;display:block}
+.radio-logo svg{width:100%;height:100%;display:block;object-fit:cover}
+
+/* Radio: visible auto-mix progress + local source selector */
+.radio-toolbar{align-items:center;flex-wrap:wrap}
+.radio-scope{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.radio-scope label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#705f61;font-weight:800}
+.radio-scope select{height:34px;min-width:190px;border:1px solid rgba(150,78,86,.22);border-radius:17px;background:rgba(9,4,6,.9);color:#ebd7d9;padding:0 28px 0 12px;outline:0}
+.radio-scope select:focus{border-color:rgba(224,31,44,.45);box-shadow:0 0 0 3px rgba(224,31,44,.06)}
+.radio-scope select:disabled{opacity:.6}
+#radioStatus{display:flex;align-items:center;gap:8px;flex:1 1 260px;min-width:180px}
+.radio-status-main{color:#c8b1b4;font-weight:700}
+.radio-status-sub{color:#736365}
+.radio-progress{display:inline-block;width:92px;height:4px;border-radius:99px;background:rgba(120,82,86,.18);overflow:hidden;flex:0 0 auto}
+.radio-progress i{display:block;height:100%;border-radius:inherit;background:var(--accent);box-shadow:0 0 8px rgba(224,31,44,.5);transition:width .2s ease}
+.radio-spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(14,7,8,.28);border-top-color:#140205;border-radius:50%;animation:radio-spin .75s linear infinite;vertical-align:-2px}
+.radio-toolbar-actions .primary.is-loading{min-width:170px}
+@keyframes radio-spin{to{transform:rotate(360deg)}}
+@media(max-width:1100px){#radioStatus{order:4;flex-basis:100%}.radio-toolbar-actions{margin-left:auto}}
+@media(max-width:700px){.radio-scope{width:100%}.radio-scope select{flex:1;min-width:0}.radio-source-tabs{order:2}.radio-toolbar-actions{width:100%;margin-left:0}.radio-toolbar-actions button{flex:1}.radio-progress{width:70px}}
+
+/* Stable chrome: the library rail and top actions stay usable while content scrolls. */
+:root{--sidebar-w:220px;--sidebar-w-collapsed:78px}
+body:not(.sidebar-collapsed){--active-sidebar-w:var(--sidebar-w)}
+body.sidebar-collapsed{--active-sidebar-w:var(--sidebar-w-collapsed)}
+.sidebar{position:relative;display:flex;flex-direction:column;min-height:0;overflow-y:auto;overflow-x:hidden}
+.genre-section{flex:0 1 auto;min-height:0}
+.genre-list{max-height:min(30vh,250px);overflow-y:auto;overflow-x:hidden;padding-right:2px}
+.sidebar > .side-section:nth-of-type(2){flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.sidebar > .side-section:nth-of-type(2) .playlist-list{flex:1 1 auto;min-height:56px;max-height:none;overflow-y:auto;overflow-x:hidden}
+.sidebar-bottom{flex:0 0 auto}
+.topbar{position:sticky!important;top:0!important;z-index:50!important;min-height:74px;box-shadow:0 8px 18px rgba(0,0,0,.22)}
+.library-top-actions{flex:0 0 auto}
+.top-action{white-space:nowrap}
+
+/* The visualizer belongs to the viewport, not the scrollable document. */
+.audio-visualizer{position:fixed!important;left:var(--active-sidebar-w)!important;right:0!important;top:var(--windowbar-h)!important;bottom:var(--player-h)!important;width:auto!important;height:auto!important;z-index:0!important;pointer-events:none!important}
+.main>.topbar,.main>.view{position:relative;z-index:1}
+
+/* A clear visual separator prevents the playlist heading from touching genre rows. */
+.genre-section + .side-section{border-top:1px solid rgba(153,79,87,.12);padding-top:10px;margin-top:12px}
+.side-heading{min-height:28px}
+
+/* Radio refresh/status controls. */
+.radio-toolbar-actions{flex-wrap:wrap}
+.radio-toolbar-actions .secondary{white-space:nowrap}
+@media(max-width:860px) and (min-width:721px){body:not(.sidebar-collapsed){--active-sidebar-w:205px}}
+@media(max-width:720px){body{--active-sidebar-w:0px}.audio-visualizer{left:0!important}}
+
+
+/* Final visualizer viewport fix: keep the visualizer full-size and centered in the visible app area, independent of main-content scrolling. */
+.audio-visualizer{
+  position:fixed!important;
+  left:220px!important;
+  right:0!important;
+  top:var(--windowbar-h)!important;
+  bottom:var(--player-h)!important;
+  width:auto!important;
+  height:auto!important;
+  inset-inline-end:0!important;
+  z-index:0!important;
+  pointer-events:none!important;
+  display:block!important;
+}
+body.sidebar-collapsed .audio-visualizer{left:78px!important}
+@media(max-width:860px){body:not(.sidebar-collapsed) .audio-visualizer{left:205px!important}}
+@media(max-width:720px){.audio-visualizer{left:0!important}}
+
+/* The sidebar should show only the total track count, without a library label or progress bar. */
+.storage-card{
+  padding:8px 10px!important;
+  min-height:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  text-align:left!important;
+}
+.storage-card #trackCountSide{
+  color:var(--accent)!important;
+  font-size:13px!important;
+  line-height:1.2!important;
+  font-weight:800!important;
+  font-variant-numeric:tabular-nums;
+}
+.storage-card .storage-label,.storage-card .progress{display:none!important}
+body.sidebar-collapsed .storage-card{padding:8px 6px!important;text-align:center!important}
+body.sidebar-collapsed .storage-card #trackCountSide{font-size:12px!important}
+
+/* Final visualizer fix: .main uses CSS containment, which can turn fixed-position
+   children into a tiny viewport. Disable containment only for the main scroller so
+   the canvas is truly tied to the application viewport. */
+.main{contain:none!important}
+.audio-visualizer{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  top:var(--windowbar-h)!important;
+  bottom:var(--player-h)!important;
+  width:100vw!important;
+  height:calc(100vh - var(--windowbar-h) - var(--player-h))!important;
+  z-index:0!important;
+  pointer-events:none!important;
+  display:block!important;
+}
+/* Keep the visualizer behind the opaque sidebar/player while allowing it to fill the app. */
+.sidebar,.player,.topbar{position:relative;z-index:8}
+.main>.topbar,.main>.view{position:relative;z-index:2}
+.storage-card .track-count-label{color:#8a7578!important;font-size:10px!important;font-weight:800!important;letter-spacing:.06em;text-transform:uppercase}
+.storage-card #trackCountSide{margin-left:3px}
+/* Player icons: clean outlined glyphs matching the neon-green UI. */
+.player .control svg,.player .player-tool svg{width:19px;height:19px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.player .play svg{width:20px;height:20px;display:block;fill:currentColor;stroke:none}
+.player .control{transition:color .15s ease,transform .15s ease}
+.player .control:hover{transform:translateY(-1px)}
+.player .play{display:grid;place-items:center}
+
+/* Collapsed sidebar: keep only the navigation icons. Hide every secondary section completely. */
+body.sidebar-collapsed .sidebar > .genre-section,
+body.sidebar-collapsed .sidebar > .side-section,
+body.sidebar-collapsed .sidebar > .sidebar-bottom{
+  display:none!important;
+  visibility:hidden!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  overflow:hidden!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+}
+body.sidebar-collapsed .sidebar{
+  overflow:hidden!important;
+}
+body.sidebar-collapsed .sidebar .nav{
+  flex:0 0 auto!important;
+}
+
+/* Collapsed sidebar: keep only the navigation icons. */
+body.sidebar-collapsed .sidebar > .genre-section,
+body.sidebar-collapsed .sidebar > .side-section,
+body.sidebar-collapsed .sidebar > .sidebar-bottom{
+  display:none!important;
+  visibility:hidden!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  overflow:hidden!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+}
+body.sidebar-collapsed .sidebar{overflow:hidden!important}
+body.sidebar-collapsed .sidebar .nav{flex:0 0 auto!important}
+
+/* Unified non-player icon language: thin neon-green outline */
+.ui-icon{width:16px;height:16px;display:inline-block;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+.top-action .ui-icon,.secondary .ui-icon,.link-btn .ui-icon{color:var(--accent)}
+.primary .ui-icon{color:inherit}
+.search-icon{display:grid!important;place-items:center;width:18px;height:18px;color:#8f777a;font-size:0}.search-icon .ui-icon{width:17px;height:17px}
+.search-clear .ui-icon,.close .ui-icon{width:17px;height:17px;vertical-align:0}
+.section-toggle .ui-icon{width:15px;height:15px;transition:transform .16s ease}.genre-section.genre-collapsed .section-toggle .ui-icon{transform:rotate(180deg)}
+.side-heading-actions button .ui-icon{width:15px;height:15px;vertical-align:0}
+.top-action{gap:7px}.top-action .ui-icon{width:15px;height:15px}
+.primary,.secondary,.link-btn,.radio-source-tab,.small-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.radio-play .ui-icon{width:17px;height:17px;fill:currentColor;stroke:none}
+#radioPlayBtn .ui-icon{width:17px!important;height:17px!important;display:inline-block!important;flex:0 0 17px!important;color:currentColor!important;fill:currentColor!important;stroke:none!important;vertical-align:middle!important}
+.radio-online-actions .ui-icon{width:14px;height:14px}.track-actions .ui-icon,.track-delete .ui-icon,.track-refresh .ui-icon{width:15px;height:15px;vertical-align:0}.track-actions button{font-size:0}
+.row-cover>.ui-icon,.card-cover>.ui-icon,.playlist-detail-cover>.ui-icon,.duplicate-cover>.ui-icon,.queue-cover>.ui-icon{width:22px;height:22px;color:#8d7174}
+.music-folder-icon .ui-icon{width:25px;height:25px;color:var(--accent)}
+.cover-preview>.ui-icon{width:25px;height:25px}
+.close{display:grid;place-items:center;padding:6px}.close .ui-icon{color:currentColor}
+.seek input{-webkit-appearance:none;appearance:none;height:5px;border-radius:999px;background:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--seek-progress,0%),rgba(224,31,44,.12) var(--seek-progress,0%),rgba(224,31,44,.12) 100%);outline:none;cursor:pointer}
+.seek input::-webkit-slider-runnable-track{height:5px;border-radius:999px;background:transparent}
+.seek input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;margin-top:-3.5px;border-radius:50%;background:var(--accent);border:2px solid #0e0508;box-shadow:0 0 0 2px rgba(224,31,44,.15),0 0 12px rgba(224,31,44,.35)}
+.seek input::-moz-range-track{height:5px;border-radius:999px;background:rgba(224,31,44,.12)}
+.seek input::-moz-range-progress{height:5px;border-radius:999px;background:var(--accent)}
+.seek input::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid #0e0508;box-shadow:0 0 0 2px rgba(224,31,44,.15)}
+
+/* Sync/compactness fixes */
+.main{contain:none!important;}
+.storage-card{white-space:nowrap!important;overflow:hidden!important;}
+.storage-card #trackCountSide{display:inline-block!important;white-space:nowrap!important;}
+.track-count-label{display:inline-block!important;white-space:nowrap!important;}
+body.sidebar-collapsed .storage-card{display:none!important;}
+
+/* Make the playback indicator visually track the audio position more precisely. */
+.seek input{height:4px!important;}
+.seek input::-webkit-slider-runnable-track{height:4px!important;}
+.seek input::-webkit-slider-thumb{width:10px!important;height:10px!important;margin-top:-3px!important;box-shadow:0 0 0 1px rgba(224,31,44,.16),0 0 8px rgba(224,31,44,.28)!important;}
+.seek input::-moz-range-track{height:4px!important;}
+.seek input::-moz-range-progress{height:4px!important;}
+.seek input::-moz-range-thumb{width:8px!important;height:8px!important;}
+
+
+/* Track count moved into the top search/actions bar. */
+.track-count-top{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  min-height:34px;
+  padding:0 11px;
+  border:1px solid rgba(153,79,87,.18);
+  border-radius:10px;
+  background:rgba(11,5,7,.72);
+  color:#8a7578;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.track-count-top #trackCountSide{
+  margin-left:0;
+  color:var(--accent);
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.01em;
+}
+.sidebar .sidebar-bottom{display:none!important}
+.brand .brand-copy{display:none!important}
+@media(max-width:1100px){
+  .library-top-actions{display:flex!important}
+  .track-count-top{display:inline-flex!important}
+}
+@media(max-width:780px){
+  .topbar{gap:7px;padding:0 10px}
+  .track-count-top{padding:0 8px;min-height:32px}
+  .track-count-top .track-count-label{font-size:9px}
+}
+
+/* Library: one scrollbar only — the virtual track list owns scrolling. */
+.main{overflow:hidden!important;}
+#libraryView.active-view{display:flex!important;flex-direction:column;min-height:0;height:calc(100% - 74px);overflow:hidden;}
+#libraryView .track-table{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+#libraryView .track-header{flex:0 0 auto;}
+#libraryView .virtual-scroll{flex:1 1 auto;height:auto;min-height:0;overflow-y:auto;overflow-x:hidden;}
+
+/* Other pages keep their own single page scroll area when needed. */
+#homeView.active-view,#playlistsView.active-view,#radioView.active-view,#onlineSearchView.active-view,#settingsView.active-view{height:calc(100% - 74px);overflow-y:auto;overflow-x:hidden;}
+
+
+/* Library track browser: keep the virtual list in a real flex column so its viewport gets height. */
+#libraryView #trackModePanel:not([hidden]){display:flex;flex:1 1 auto;min-height:0;flex-direction:column;overflow:hidden}
+#libraryView #trackModePanel .toolbar{flex:0 0 auto}
+
+/* Library album browser: its own scroll area, plus quick previous/next navigation. */
+#libraryView #albumModePanel:not([hidden]){display:flex;flex:1 1 auto;min-height:0;flex-direction:column;overflow:hidden}
+#libraryView .album-browser-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;padding:2px 2px 12px;color:var(--text-body)}
+#libraryView .album-browser-toolbar span{color:var(--text-soft);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#libraryView #albumGrid{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;align-content:start;padding:0 6px 18px 0;scrollbar-gutter:stable}
+#libraryView #albumDetail:not([hidden]){flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:4px;scrollbar-gutter:stable}
+.album-detail-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:0 0 10px}
+.album-nav-actions{display:flex;gap:7px}
+.icon-text-btn:disabled{opacity:.42;cursor:not-allowed}
+.action-icon{width:17px!important;height:17px!important;min-width:17px;stroke-width:2.1!important}
+#topAddBtn .action-icon,#heroAddBtn .action-icon{color:currentColor}
+.remote-actions .ui-icon{width:15px;height:15px;flex:0 0 15px;fill:currentColor;stroke:none;vertical-align:middle}
+.remote-actions .primary .ui-icon{color:inherit}
+.album-card .album-cover .ui-icon{width:30px;height:30px}
+@media(max-width:640px){#libraryView .album-browser-toolbar{padding-bottom:10px}.album-nav-actions{width:100%}.album-nav-actions button{flex:1}.album-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
