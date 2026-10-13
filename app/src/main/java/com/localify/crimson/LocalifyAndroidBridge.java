@@ -165,6 +165,7 @@ public class LocalifyAndroidBridge {
                 case "pickFolder":
                     intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); break;
                 case "chooseLibraryFolder":
+                case "chooseDownloadFolder":
                     intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); break;
                 case "pickImage":
                     intent = new Intent(Intent.ACTION_OPEN_DOCUMENT); intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -172,7 +173,7 @@ public class LocalifyAndroidBridge {
                 default:
                     pendingCallbackId = -1; pendingAction = ""; finishCallback(callbackId, new JSONObject(), "Неизвестное действие"); return;
             }
-            if (Build.VERSION.SDK_INT >= 26 && (action.equals("chooseLibraryFolder") || action.equals("pickFolder"))) {
+            if (Build.VERSION.SDK_INT >= 26 && (action.equals("chooseLibraryFolder") || action.equals("chooseDownloadFolder") || action.equals("pickFolder"))) {
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             } else {
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -205,6 +206,14 @@ public class LocalifyAndroidBridge {
                     Uri tree = data.getData();
                     if (tree == null) { finishCallback(callback, JSONObject.NULL, null); return; }
                     takePersistable(tree, data);
+                    if ("chooseDownloadFolder".equals(action)) {
+                        saveDownloadFolder(tree.toString());
+                        JSONObject result = new JSONObject();
+                        put(result, "folder", tree.toString());
+                        put(result, "displayName", downloadFolderDisplayName(tree));
+                        finishCallback(callback, result.toString(), null);
+                        return;
+                    }
                     if ("chooseLibraryFolder".equals(action)) saveMusicFolder(tree.toString());
                     JSONArray tracks = "chooseLibraryFolder".equals(action) ? scanTree(tree, 0, loadTrackCache()) : scanTree(tree, 0);
                     if ("chooseLibraryFolder".equals(action)) {
@@ -752,13 +761,30 @@ public class LocalifyAndroidBridge {
         if (downloaded == null || !downloaded.isFile() || downloaded.length() <= 0) {
             throw new IOException("yt-dlp не создал MP3-файл");
         }
-        String name = safeDownloadName(source.optString("title", stripExtension(downloaded.getName()))) + ".mp3";
+        String extension = stripExtension(downloaded.getName()).equals(downloaded.getName()) ? "mp3" : downloaded.getName().substring(downloaded.getName().lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        if (!extension.matches("mp3|m4a|opus|webm|aac")) extension = "mp3";
+        String name = safeDownloadName(source.optString("title", stripExtension(downloaded.getName()))) + "." + extension;
         Uri resultUri;
         ContentResolver resolver = activity.getContentResolver();
-        if (Build.VERSION.SDK_INT >= 29) {
+        String selectedDownloadFolder = readJsonFile("settings.json", defaultSettings()).optString("downloadFolder", "").trim();
+        if (!selectedDownloadFolder.isEmpty()) {
+            Uri treeUri = Uri.parse(selectedDownloadFolder);
+            String mime = extension.equals("mp3") ? "audio/mpeg" : extension.equals("m4a") ? "audio/mp4" : extension.equals("aac") ? "audio/aac" : "audio/*";
+            resultUri = DocumentsContract.createDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri)), mime, name);
+            if (resultUri == null) throw new IOException("Не удалось создать файл в выбранной папке загрузок");
+            try (InputStream input = new FileInputStream(downloaded); java.io.OutputStream output = resolver.openOutputStream(resultUri, "w")) {
+                if (output == null) throw new IOException("Не удалось записать файл в выбранную папку");
+                byte[] buffer = new byte[65536]; int count;
+                while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+                output.flush();
+            } catch (Exception ex) {
+                try { resolver.delete(resultUri, null, null); } catch (Exception ignored) {}
+                throw ex;
+            }
+        } else if (Build.VERSION.SDK_INT >= 29) {
             ContentValues values = new ContentValues();
             values.put(MediaStore.Audio.Media.DISPLAY_NAME, name);
-            values.put(MediaStore.Audio.Media.MIME_TYPE, "audio/mpeg");
+            values.put(MediaStore.Audio.Media.MIME_TYPE, extension.equals("mp3") ? "audio/mpeg" : extension.equals("m4a") ? "audio/mp4" : extension.equals("aac") ? "audio/aac" : "audio/*");
             values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/Localify Downloads");
             values.put(MediaStore.Audio.Media.IS_PENDING, 1);
             resultUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
@@ -804,7 +830,7 @@ public class LocalifyAndroidBridge {
         put(localTrack, "downloadAllowed", false);
         JSONObject result = new JSONObject();
         put(result, "path", resultUri.toString());
-        put(result, "format", "mp3");
+        put(result, "format", extension);
         put(result, "duplicate", false);
         result.put("track", localTrack);
         return result;
@@ -903,13 +929,26 @@ public class LocalifyAndroidBridge {
         try {
             x.put("closeToTray", false); x.put("startMinimized", false); x.put("trayEnabled", false); x.put("minimizeToTray", false);
             x.put("mediaKeys", true); x.put("notifications", true); x.put("onlineMetadata", true); x.put("renameFiles", false); x.put("moveFilesIntoPlaylists", false);
-            x.put("musicFolder", ""); x.put("ytDlpPath", "Not available in Android build"); x.put("cookiesFile", ""); x.put("proxy", ""); x.put("downloadMode", "m4a");
+            x.put("musicFolder", ""); x.put("downloadFolder", ""); x.put("ytDlpPath", "Not available in Android build"); x.put("cookiesFile", ""); x.put("proxy", ""); x.put("downloadMode", "m4a");
             x.put("gapless", true); x.put("uiDensity", "normal"); x.put("coverSize", "medium"); x.put("reduceMotion", false); x.put("compactPlayer", false); x.put("autoWatch", false);
         } catch (Exception ignored) {}
         return x;
     }
     private void saveMusicFolder(String uri) {
         JSONObject settings = readJsonFile("settings.json", defaultSettings()); put(settings, "musicFolder", uri); put(settings, "moveFilesIntoPlaylists", false); writeJsonFile("settings.json", settings);
+    }
+    private void saveDownloadFolder(String uri) {
+        JSONObject settings = readJsonFile("settings.json", defaultSettings()); put(settings, "downloadFolder", uri); writeJsonFile("settings.json", settings);
+    }
+    private String downloadFolderDisplayName(Uri tree) {
+        try {
+            String documentId = DocumentsContract.getTreeDocumentId(tree);
+            if (documentId == null || documentId.isEmpty()) return "Выбранная папка Android";
+            int colon = documentId.indexOf(':');
+            String path = colon >= 0 ? documentId.substring(colon + 1) : documentId;
+            path = path.replace("/", " › ").trim();
+            return path.isEmpty() ? "Корень хранилища" : path;
+        } catch (Exception ignored) { return "Выбранная папка Android"; }
     }
     private String queryDisplayName(Uri uri) {
         try (Cursor c = activity.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
