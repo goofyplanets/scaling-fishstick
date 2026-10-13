@@ -489,30 +489,6 @@ public class LocalifyAndroidBridge {
         } catch (Exception e) { return "null"; }
     }
 
-    private JSONArray itunesSearch(String query, int limit) throws Exception {
-        JSONArray out = new JSONArray(); if (query == null || query.trim().isEmpty()) return out;
-        String endpoint = "https://itunes.apple.com/search?media=music&entity=song&limit=" + limit + "&term=" + URLEncoder.encode(query, "UTF-8");
-        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
-        connection.setConnectTimeout(4500); connection.setReadTimeout(5500); connection.setRequestProperty("User-Agent", "LocalifyCrimson-Android/1.2.0");
-        try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[8192]; int n; while ((n = input.read(buffer)) >= 0) output.write(buffer, 0, n);
-            JSONObject root = new JSONObject(output.toString("UTF-8")); JSONArray rows = root.optJSONArray("results"); if (rows == null) return out;
-            for (int i = 0; i < rows.length(); i++) {
-                JSONObject r = rows.getJSONObject(i); String preview = r.optString("previewUrl", ""); if (preview.isEmpty()) continue;
-                JSONObject track = new JSONObject(); String trackId = r.optString("trackId", "remote-" + i);
-                put(track, "id", "remote:itunes:" + trackId); put(track, "provider", "itunes"); put(track, "providerId", trackId);
-                put(track, "title", r.optString("trackName", "Без названия")); put(track, "artist", r.optString("artistName", ""));
-                put(track, "album", r.optString("collectionName", "")); put(track, "duration", r.optLong("trackTimeMillis", 0) / 1000.0);
-                put(track, "year", r.optString("releaseDate", "").length() >= 4 ? r.optString("releaseDate").substring(0, 4) : "");
-                put(track, "genre", r.optString("primaryGenreName", ""));
-                String artwork = r.optString("artworkUrl100", "").replace("100x100bb", "600x600bb");
-                put(track, "cover", artwork); put(track, "remoteCover", artwork); put(track, "sourceUrl", r.optString("trackViewUrl", ""));
-                put(track, "streamUrl", preview); put(track, "url", preview); put(track, "downloadAllowed", false); out.put(track);
-            }
-        } finally { connection.disconnect(); }
-        return out;
-    }
-
     @JavascriptInterface public boolean openExternal(String rawUrl) {
         try {
             Uri uri = Uri.parse(rawUrl);
@@ -605,19 +581,6 @@ public class LocalifyAndroidBridge {
             } catch (Exception ex) {
                 Log.w(TAG, "Manual yt-dlp update failed", ex);
                 finishCallback(callbackId, JSONObject.NULL, ex.getMessage() == null ? "Не удалось обновить yt-dlp" : ex.getMessage());
-            }
-        });
-    }
-
-    @JavascriptInterface public void searchItunes(String raw, int callbackId) {
-        JSONObject payload = parseObject(raw);
-        String query = payload.optString("query", "").trim();
-        int limit = Math.max(1, Math.min(20, payload.optInt("limit", 12)));
-        ytDlpExecutor.execute(() -> {
-            try { finishCallback(callbackId, itunesSearch(query, limit), null); }
-            catch (Exception ex) {
-                Log.w(TAG, "iTunes preview search failed", ex);
-                finishCallback(callbackId, new JSONArray(), null);
             }
         });
     }
