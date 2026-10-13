@@ -86,6 +86,11 @@
       saveConfig: data => Promise.resolve(native.saveProviderConfig(JSON.stringify(data || {}))),
       onlineSearch: payload => Promise.resolve(parse(native.onlineSearch(JSON.stringify(payload || {})), [])),
       openSource: url => Promise.resolve(native.openExternal(String(url || ''))),
+      downloadWithYtdlnis: payload => new Promise((resolve,reject) => {
+        const id=++requestId; pending.set(id,{resolve,reject});
+        try { native.downloadWithYtdlnis(JSON.stringify(payload||{}),id); }
+        catch(error) { pending.delete(id); reject(error); }
+      }),
       diagnostics: () => Promise.resolve(parse(native.providerDiagnostics(), {})),
       onDownloadProgress: none,
       downloadYtDlp: () => Promise.reject(new Error('Загрузка через yt-dlp пока не реализована в Android-сборке. Доступны онлайн-превью.')),

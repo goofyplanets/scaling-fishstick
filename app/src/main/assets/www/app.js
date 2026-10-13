@@ -841,7 +841,7 @@ function setupDialogAccessibility() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.body.classList.contains('mobile-full-player-open')) closeMobileFullPlayer();
   });
-  bindMobileTrackSwipe($('#miniCover'));
+  bindMobileTrackSwipe($('.player'));
   bindMobileTrackSwipe($('#mobileFullCover'));
   $('#settingMinimizeToTray').addEventListener('change', saveSettingsFromUI);
   $('#settingCloseToTray').addEventListener('change', saveSettingsFromUI);
@@ -1785,12 +1785,21 @@ function renderOnlineSearch(){
   if(status) status.textContent=state.onlineSearchLoading ? (window.__LOCALIFY_ANDROID__ ? `Ищу музыкальные превью для «${q}»…` : `Ищу «${q}» на YouTube…`) : (q ? `Результаты для «${q}»` : 'Введите запрос в поиске выше');
   if(state.onlineSearchLoading){ box.innerHTML=`<div class="empty online-loading">${window.__LOCALIFY_ANDROID__?'Поиск музыкальных превью…':'Поиск через yt-dlp…'}</div>`; return; }
   const list=state.onlineSearchResults||[];
-  box.innerHTML=list.length ? list.map((c,i)=>`<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='itunes'?'iTunes Preview':'YouTube'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button><button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='itunes'?'Открыть страницу':'Открыть YouTube'}</button></div></div></article>`).join('') : `<div class="empty">${q?'Ничего не найдено. Проверьте yt-dlp и интернет-соединение.':'Введите запрос для онлайн-поиска.'}</div>`;
+  box.innerHTML=list.length ? list.map((c,i)=>{
+    const canUseYtdlnis=!!window.__LOCALIFY_ANDROID__ && c.provider!=='itunes' && /^https?:\/\//i.test(String(c.sourceUrl||''));
+    return `<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='itunes'?'iTunes Preview':'YouTube'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button>${canUseYtdlnis?`<button type="button" class="secondary small-btn" data-online-ytdlnis="${i}">${uiIcon('download')} Скачать через YTDLnis</button>`:''}<button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='itunes'?'Открыть страницу':'Открыть YouTube'}</button></div></div></article>`;
+  }).join('') : `<div class="empty">${q?'Ничего не найдено. Проверьте yt-dlp и интернет-соединение.':'Введите запрос для онлайн-поиска.'}</div>`;
   box.onclick=async e=>{
-    const btn=e.target.closest('[data-online-play],[data-online-download],[data-online-source]'); if(!btn)return;
-    const i=Number(btn.dataset.onlinePlay??btn.dataset.onlineDownload??btn.dataset.onlineSource); const track=state.onlineSearchResults[i]; if(!track)return;
+    const btn=e.target.closest('[data-online-play],[data-online-download],[data-online-source],[data-online-ytdlnis]'); if(!btn)return;
+    const i=Number(btn.dataset.onlinePlay??btn.dataset.onlineDownload??btn.dataset.onlineSource??btn.dataset.onlineYtdlnis); const track=state.onlineSearchResults[i]; if(!track)return;
     if(btn.dataset.onlinePlay!==undefined) return playRemoteTrack(track);
     if(btn.dataset.onlineDownload!==undefined) return downloadRecommendation(track);
+    if(btn.dataset.onlineYtdlnis!==undefined) {
+      if(!window.localify.providers.downloadWithYtdlnis){ toast('Интеграция YTDLnis доступна только в Android-сборке'); return; }
+      try { await window.localify.providers.downloadWithYtdlnis({url:track.sourceUrl,title:track.title,artist:track.artist}); toast('Трек передан в YTDLnis'); }
+      catch(err) { console.error(err); toast(err?.message||'Не удалось открыть YTDLnis. Проверьте, что приложение установлено.'); }
+      return;
+    }
     try{ await window.localify.providers.openSource(track.sourceUrl); }catch(err){ console.error(err); toast('Не удалось открыть YouTube'); }
   };
 }
@@ -2484,6 +2493,8 @@ function bindMobileTrackSwipe(element) {
   element.style.touchAction = 'pan-y';
   element.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse') return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('button,input,select,textarea,.seek')) { start = null; return; }
     start = {x:event.clientX, y:event.clientY, id:event.pointerId};
   }, {passive:true});
   element.addEventListener('pointercancel', () => { start = null; }, {passive:true});

@@ -516,6 +516,33 @@ public class LocalifyAndroidBridge {
     @JavascriptInterface public String getLibraryWatchStatus() { return "{\"enabled\":false,\"active\":false,\"folder\":\"\"}"; }
     @JavascriptInterface public void ignoreEvent(String ignored) {}
 
+    @JavascriptInterface public void downloadWithYtdlnis(String raw, int callbackId) {
+        JSONObject payload = parseObject(raw);
+        String url = payload.optString("url", payload.optString("sourceUrl", "")).trim();
+        Uri parsed = Uri.parse(url);
+        String scheme = parsed.getScheme() == null ? "" : parsed.getScheme().toLowerCase(Locale.ROOT);
+        if (!(scheme.equals("https") || scheme.equals("http")) || url.length() > 4096) {
+            finishCallback(callbackId, JSONObject.NULL, "У результата нет поддерживаемой веб-ссылки для YTDLnis");
+            return;
+        }
+        activity.runOnUi(() -> {
+            try {
+                Intent intent = new Intent(Intent.ACTION_SEND);
+                intent.setType("text/plain");
+                intent.putExtra(Intent.EXTRA_TEXT, url);
+                intent.putExtra("TYPE", "audio");
+                intent.putExtra("BACKGROUND", false);
+                intent.setPackage("com.deniscerri.ytdl");
+                activity.startActivity(intent);
+                finishCallback(callbackId, new JSONObject(), null);
+            } catch (android.content.ActivityNotFoundException ex) {
+                finishCallback(callbackId, JSONObject.NULL, "YTDLnis не установлен. Установите YTDLnis, затем повторите скачивание.");
+            } catch (Exception ex) {
+                finishCallback(callbackId, JSONObject.NULL, "Не удалось открыть YTDLnis: " + ex.getMessage());
+            }
+        });
+    }
+
     @JavascriptInterface public void updatePlayback(String raw) {
         JSONObject payload = parseObject(raw); boolean playing = payload.optBoolean("playing", false);
         Intent intent = new Intent(activity, PlaybackService.class);
