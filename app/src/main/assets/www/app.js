@@ -49,7 +49,7 @@ const state = {
   currentView: 'home',
   currentPlaylist: null,
   coverDraft: '',
-  settings: { closeToTray: true, startMinimized: false, trayEnabled: true, minimizeToTray: true, mediaKeys: true, notifications: true, onlineMetadata: true, renameFiles: false, moveFilesIntoPlaylists: true, musicFolder: '', ytDlpPath: 'yt-dlp', cookiesFile: '', proxy: '', downloadMode: 'mp3', gapless: true, uiDensity: 'normal', coverSize: 'medium', reduceMotion: false, compactPlayer: false, autoWatch: true },
+  settings: { closeToTray: true, startMinimized: false, trayEnabled: true, minimizeToTray: true, mediaKeys: true, notifications: true, onlineMetadata: true, renameFiles: false, moveFilesIntoPlaylists: true, musicFolder: '', ytDlpPath: 'yt-dlp', cookiesFile: '', proxy: '', downloadMode: 'mp3', downloadFolder: '', downloadFolderLabel: '', gapless: true, uiDensity: 'normal', coverSize: 'medium', reduceMotion: false, compactPlayer: false, autoWatch: true },
   pendingConfirm: null,
   syncingLibrary: false,
   coverHydrationRunning: false,
@@ -792,6 +792,9 @@ function setupDialogAccessibility() {
     if (e.key === 'Escape' && document.body.classList.contains('mobile-search-open')) setMobileSearchOpen(false);
   });
   $('#chooseMusicFolder').addEventListener('click', chooseAndSetMusicFolder);
+  $('#chooseDownloadFolder')?.addEventListener('click', chooseAndSetDownloadFolder);
+  $('#resetDownloadFolder')?.addEventListener('click', async () => { state.settings.downloadFolder = ''; state.settings.downloadFolderLabel = ''; await window.localify.settings.save(state.settings); renderSettings(); toast('Будет использоваться Music/Localify Downloads'); });
+  $('#settingAndroidDownloadMode')?.addEventListener('change', saveSettingsFromUI);
   $('#rescanMusicFolder').addEventListener('click', () => syncConfiguredLibrary(true));
   $('#openMusicFolder').addEventListener('click', async () => { const p = await window.localify.openLibraryFolder(); if(!p) toast('Папка библиотеки не выбрана'); });
   window.localify.onLibraryFolderChanged(payload => syncConfiguredLibrary(false, payload));
@@ -947,6 +950,10 @@ function setupDialogAccessibility() {
 
 function renderSettings() {
   window.LocalifySettingsUI?.render(state.settings, state.providerConfig);
+  const mode = $('#settingAndroidDownloadMode');
+  if (mode) mode.value = state.settings.downloadMode === 'original' ? 'original' : 'mp3';
+  const folder = $('#downloadFolderPath');
+  if (folder) folder.textContent = state.settings.downloadFolder ? (state.settings.downloadFolderLabel || 'Выбрана папка Android') : 'По умолчанию: Music/Localify Downloads';
   updateMetadataQueueStatus();
 }
 
@@ -1011,6 +1018,8 @@ function updateWindowMaxButton(maximized) {
 async function saveSettingsFromUI() {
   const previousPlaylistMode = state.settings.moveFilesIntoPlaylists !== false;
   state.settings = { ...state.settings, ...(window.LocalifySettingsUI?.read(state.settings) || {}) };
+  const androidDownloadMode = $('#settingAndroidDownloadMode');
+  if (androidDownloadMode) state.settings.downloadMode = androidDownloadMode.value === 'original' ? 'original' : 'mp3';
   await window.localify.settings.save(state.settings);
   applySettings();
   applyBranding();
@@ -1258,6 +1267,17 @@ async function chooseAndSetMusicFolder(){
   state.settings.musicFolder = result.folder;
   await window.localify.settings.save(state.settings);
   await applyLibraryScanResult(result, true);
+}
+async function chooseAndSetDownloadFolder(){
+  try {
+    const result = await window.localify.chooseDownloadFolder();
+    if (!result?.folder) return;
+    state.settings.downloadFolder = result.folder;
+    state.settings.downloadFolderLabel = result.displayName || 'Выбрана папка Android';
+    await window.localify.settings.save(state.settings);
+    renderSettings();
+    toast('Папка загрузок сохранена');
+  } catch (err) { console.error(err); toast(err?.message || 'Не удалось выбрать папку загрузок'); }
 }
 function normalizeTrack(track){ const next={ ...track, id: track?.id || uid('trk'), addedAt: track?.addedAt || Date.now(), sourcePath: track?.sourcePath || track?.path || '', path: track?.path || track?.sourcePath || '' }; delete next.liked; delete next.replayGainTrack; delete next.replayGainAlbum; delete next.crossfade; return rebuildTrackSearchIndex(next); }
 async function addTracks(tracks, notify = true){
@@ -1773,7 +1793,10 @@ async function runOnlineSearch(query=state.search, openView=true){
     const cacheKey=`${q.toLocaleLowerCase()}::12`;
     const cached=getOnlineCache(cacheKey);
     if(cached && Date.now()-cached.at<5*60*1000){
-      if(token===state.onlineSearchToken) state.onlineSearchResults=filterOnlineResults(cached.results);
+      if(token===state.onlineSearchToken) {
+        state.onlineSearchResults=filterOnlineResults(cached.results);
+        prewarmOnlinePlayback(state.onlineSearchResults);
+      }
       return state.onlineSearchResults;
     }
     const results=await window.localify.providers.onlineSearch({query:q,limit:12,localLibrary:state.library.map(t=>({title:t.title,artist:t.artist,provider:t.provider,providerId:t.providerId}))});
@@ -1781,12 +1804,20 @@ async function runOnlineSearch(query=state.search, openView=true){
     const filtered=filterOnlineResults(results||[]);
     setOnlineCache(cacheKey,{at:Date.now(),results:filtered});
     state.onlineSearchResults=filtered;
+    prewarmOnlinePlayback(filtered);
     return state.onlineSearchResults;
   }catch(err){
     if(token===state.onlineSearchToken){ console.error(err); toast(err?.message||'Не удалось выполнить онлайн-поиск'); }
     return [];
   }
   finally{ if(token===state.onlineSearchToken){ state.onlineSearchLoading=false; renderOnlineSearch(); } }
+}
+function prewarmOnlinePlayback(results){
+  if (!window.__LOCALIFY_ANDROID__ || !Array.isArray(results)) return;
+  // Resolve the first two hits in the background so tapping Play avoids the initial format lookup.
+  results.slice(0, 2).forEach(track => {
+    if (track?.provider === 'youtube' && !track.streamUrl) void ensureRemoteStream(track, true).catch(() => {});
+  });
 }
 function renderOnlineSearch(){
   const box=$('#onlineSearchResults'); if(!box) return;
