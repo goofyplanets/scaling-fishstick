@@ -1799,6 +1799,11 @@ function renderOnlineSearch(){
     const canUseYtdlnis=false;
     return `<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='itunes'?'iTunes Preview':'YouTube'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button>${canUseYtdlnis?`<button type="button" class="secondary small-btn" data-online-ytdlnis="${i}">${uiIcon('download')} Скачать через YTDLnis</button>`:''}<button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='itunes'?'Открыть страницу':'Открыть YouTube'}</button></div></div></article>`;
   }).join('') : `<div class="empty">${q?'Ничего не найдено. Проверьте yt-dlp и интернет-соединение.':'Введите запрос для онлайн-поиска.'}</div>`;
+  if(window.__LOCALIFY_ANDROID__) {
+    box.querySelectorAll('.online-card').forEach((card, index) => {
+      if(state.onlineSearchResults[index]?.provider === 'itunes') card.querySelector('[data-online-download]')?.remove();
+    });
+  }
   box.onclick=async e=>{
     const btn=e.target.closest('[data-online-play],[data-online-download],[data-online-source]'); if(!btn)return;
     const i=Number(btn.dataset.onlinePlay??btn.dataset.onlineDownload??btn.dataset.onlineSource); const track=state.onlineSearchResults[i]; if(!track)return;
