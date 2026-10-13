@@ -161,6 +161,29 @@
       <button id="compactModeBtn" class="icon-btn player-tool" type="button" title="Компактный режим (мини-плеер)" aria-label="Компактный режим" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M8 18v0M16 4v4M20 4v4"/></svg></button>
     </div>
   </footer>
+  <section id="mobileFullPlayer" class="mobile-full-player" aria-hidden="true" aria-label="Полноэкранный плеер">
+    <header class="mobile-full-top">
+      <button id="mobileFullClose" class="mobile-full-icon" type="button" aria-label="Свернуть плеер" title="Свернуть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button>
+      <div class="mobile-full-context"><small>Сейчас играет из</small><b id="mobileFullPlayerContext">Моя музыка</b></div>
+      <button id="mobileFullQueueTop" class="mobile-full-icon" type="button" aria-label="Открыть очередь" title="Очередь"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h8"/></svg></button>
+    </header>
+    <div class="mobile-full-art-area"><div id="mobileFullCover" class="mobile-full-cover" role="img" aria-label="Обложка альбома">♪</div></div>
+    <div class="mobile-full-track-info"><div class="mobile-full-track-text">
+      <b id="mobileFullTitle">Ничего не играет</b><small id="mobileFullArtist">Выберите трек</small><small id="mobileFullAlbum" class="mobile-full-album" hidden></small>
+    </div></div>
+    <div class="mobile-full-progress">
+      <input id="mobileFullSeek" type="range" min="0" max="100" value="0" aria-label="Позиция воспроизведения">
+      <div class="mobile-full-times"><span id="mobileFullElapsed">0:00</span><span id="mobileFullDuration">0:00</span></div>
+    </div>
+    <div class="mobile-full-controls">
+      <button id="mobileFullShuffleBtn" class="mobile-full-control utility" type="button" aria-label="Перемешать" title="Перемешать"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h2.2c2.2 0 3.1 1.1 4.2 3l3.2 5c1.1 1.9 2 3 4.2 3H20"/><path d="m17 5 3 2-3 2M17 15l3 2-3 2"/><path d="M4 17h2.2c1.2 0 2.1-.4 2.8-1.2M15.2 8.2C16.1 7.4 17 7 18 7H20"/></svg></button>
+      <button id="mobileFullPrevBtn" class="mobile-full-control" type="button" aria-label="Предыдущий трек" title="Предыдущий трек"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14"/><path d="m19 6-8 6 8 6V6Z"/></svg></button>
+      <button id="mobileFullPlayBtn" class="mobile-full-play" type="button" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.2 18 12l-9.5 6.8V5.2Z"/></svg></button>
+      <button id="mobileFullNextBtn" class="mobile-full-control" type="button" aria-label="Следующий трек" title="Следующий трек"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14"/><path d="m5 6 8 6-8 6V6Z"/></svg></button>
+      <button id="mobileFullRepeatBtn" class="mobile-full-control utility" type="button" aria-label="Повтор" title="Повтор"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-2.5-2.5M18 17H7l2.5 2.5"/><path d="M18 7a4 4 0 0 1 0 10M6 17A4 4 0 0 1 6 7"/></svg></button>
+    </div>
+    <footer class="mobile-full-bottom"><button id="mobileFullQueueBottom" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11M4 11h11M4 16h7"/><path d="M17 14v6m0 0 3-3m-3 3-3-3"/></svg><span>Очередь</span></button><span id="mobileFullPlaybackStatus">Localify Crimson</span></footer>
+  </section>
   <audio id="audio"></audio>
 
   <dialog id="playlistDialog" class="modal"><form method="dialog"><div class="modal-head"><div><div class="eyebrow">ПЛЕЙЛИСТ</div><h3>Новый плейлист</h3></div><button value="cancel" class="close" aria-label="Закрыть" title="Закрыть"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button></div><label>Название<input id="playlistName" maxlength="80" placeholder="Например, Night Drive"></label><label>Обложка<div class="cover-picker"><div id="coverPreview" class="cover-preview"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></div><button type="button" class="secondary" id="chooseCover">Выбрать изображение</button></div></label><div class="modal-actions"><button value="cancel" class="secondary">Отмена</button><button value="default" class="primary" id="createPlaylistSubmit">Создать</button></div></form></dialog>

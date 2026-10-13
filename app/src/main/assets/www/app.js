@@ -851,7 +851,39 @@ function setupDialogAccessibility() {
   $('#prevBtn').addEventListener('click', previous);
   $('#nextBtn').addEventListener('click', next);
   $('#shuffleBtn').addEventListener('click', toggleShuffleMode);
-  $('#repeatBtn').addEventListener('click', () => { state.repeat = !state.repeat; $('#repeatBtn').style.color = state.repeat ? 'var(--accent)' : ''; saveQueueSnapshot(); });
+  const toggleRepeatMode = () => {
+    state.repeat = !state.repeat;
+    for (const selector of ['#repeatBtn', '#mobileFullRepeatBtn']) {
+      const button = $(selector);
+      if (button) { button.style.color = state.repeat ? 'var(--accent)' : ''; button.classList.toggle('active', state.repeat); }
+    }
+    saveQueueSnapshot();
+  };
+  $('#repeatBtn').addEventListener('click', toggleRepeatMode);
+  $('#mobileFullClose')?.addEventListener('click', closeMobileFullPlayer);
+  $('#mobileFullPrevBtn')?.addEventListener('click', previous);
+  $('#mobileFullPlayBtn')?.addEventListener('click', togglePlay);
+  $('#mobileFullNextBtn')?.addEventListener('click', next);
+  $('#mobileFullShuffleBtn')?.addEventListener('click', toggleShuffleMode);
+  $('#mobileFullRepeatBtn')?.addEventListener('click', toggleRepeatMode);
+  $('#mobileFullQueueTop')?.addEventListener('click', () => { closeMobileFullPlayer(); $('#queueBtn')?.click(); });
+  $('#mobileFullQueueBottom')?.addEventListener('click', () => { closeMobileFullPlayer(); $('#queueBtn')?.click(); });
+  $('#mobileFullSeek')?.addEventListener('input', e => {
+    if (audio.duration) audio.currentTime = Number(e.target.value) / 100 * audio.duration;
+    queuePlaybackProgress();
+  });
+  $('.player')?.addEventListener('click', e => {
+    if (!document.documentElement.classList.contains('android-app')) return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target || target.closest('button,input,select,textarea,.seek')) return;
+    if (Date.now() - (state._mobileSwipeAt || 0) < 550) return;
+    openMobileFullPlayer();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('mobile-full-player-open')) closeMobileFullPlayer();
+  });
+  bindMobileTrackSwipe($('#miniCover'));
+  bindMobileTrackSwipe($('#mobileFullCover'));
   $('#settingMinimizeToTray').addEventListener('change', saveSettingsFromUI);
   $('#settingCloseToTray').addEventListener('change', saveSettingsFromUI);
   $('#settingTrayEnabled').addEventListener('change', saveSettingsFromUI);
@@ -1559,13 +1591,19 @@ async function applyLibraryScanResult(result, notify=true){
     const scanned = scannedPlaylistIds.get(p.id);
     if(scanned) p.trackIds = (p.trackIds || []).filter(id => scanned.has(id));
   }
-  const currentPaths = new Set((result.foundPaths || []).filter(Boolean).map(normalizeFsPath));
+  const hasExplicitPathList = Array.isArray(result.foundPaths);
+  const scanTracks = Array.isArray(result.tracks) ? result.tracks : [];
+  const scanPaths = hasExplicitPathList ? result.foundPaths : scanTracks.map(track => track?.sourcePath || track?.path || '').filter(Boolean);
+  const currentPaths = new Set(scanPaths.filter(Boolean).map(normalizeFsPath));
+  const hasScanEvidence = currentPaths.size > 0;
   const configuredRoot = normalizeFsPath(state.settings.musicFolder || '');
   const playlistRoot = normalizeFsPath((state.settings.musicFolder ? `${state.settings.musicFolder}/Localify Playlists` : ''));
   const removedIds = new Set();
+  // Don't prune a music library based on an empty scan result. Android SAF scans
+  // return tracks but may omit foundPaths; derive them from the scanned tracks instead.
   state.library = state.library.filter(t => {
     const path = normalizeFsPath(t.sourcePath || t.path || '');
-    if(!path || !configuredRoot) return true;
+    if(!path || !configuredRoot || !hasScanEvidence) return true;
     const underConfigured = path === configuredRoot || path.startsWith(configuredRoot + '/');
     const underPlaylist = playlistRoot && (path === playlistRoot || path.startsWith(playlistRoot + '/'));
     if((underConfigured || underPlaylist) && !currentPaths.has(path)){ removedIds.add(t.id); return false; }
@@ -2014,7 +2052,7 @@ function renderOnlineSearch(){
 function closeSearchSuggestions(){ const box=$('#searchSuggestions'); if(box){ box.hidden=true; state.searchSuggestionsOpen=false; } }
 function updatePlaybackProgress(){
   const duration = Number(audio.duration)||0; const current = Number(audio.currentTime)||0; const pct = duration ? current/duration*100 : 0;
-  for (const [inputId, elapsedId, durationId] of [['seekbar','elapsed','duration']]) {
+  for (const [inputId, elapsedId, durationId] of [['seekbar','elapsed','duration'], ['mobileFullSeek','mobileFullElapsed','mobileFullDuration']]) {
     const input=$(`#${inputId}`), elapsed=$(`#${elapsedId}`), dur=$(`#${durationId}`);
     if(input){ input.value=String(pct); input.style.setProperty('--value',`${pct}%`); input.style.setProperty('--seek-progress',`${pct}%`); }
     if(elapsed) elapsed.textContent=fmtTime(current);
@@ -2658,23 +2696,82 @@ function logLocalify(event, data={}) { try { window.LocalifyLogger?.write(event,
 function updateShuffleUI(){
   const mode=state.shuffleMode || (state.shuffle ? 'normal' : 'off');
   state.shuffleMode=mode; state.shuffle=mode!=='off';
-  const b=$('#shuffleBtn'); if(b){ b.classList.toggle('active',state.shuffle); b.style.color=state.shuffle?'var(--accent)':''; b.title=state.shuffle?'Перемешивание включено':'Перемешивание выключено'; b.setAttribute('aria-label',b.title); }
+  for (const b of [$('#shuffleBtn'), $('#mobileFullShuffleBtn')]) {
+    if (!b) continue;
+    b.classList.toggle('active',state.shuffle);
+    b.style.color=state.shuffle?'var(--accent)':'';
+    b.title=state.shuffle?'Перемешивание включено':'Перемешивание выключено';
+    b.setAttribute('aria-label',b.title);
+  }
 }
 
 function syncPlayButton(playing) {
   const icon = playing
     ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.5" height="14" rx="1.2"/><rect x="13.5" y="5" width="3.5" height="14" rx="1.2"/></svg>'
     : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.2 18 12l-9.5 6.8V5.2Z"/></svg>';
-  const btn = $('#playBtn');
-  if (btn) {
+  for (const btn of [$('#playBtn'), $('#mobileFullPlayBtn')]) {
+    if (!btn) continue;
     btn.innerHTML = icon;
     btn.setAttribute('aria-label', playing ? 'Пауза' : 'Воспроизвести');
     btn.setAttribute('title', playing ? 'Пауза' : 'Воспроизвести');
     btn.classList.toggle('is-playing', playing);
   }
 }
+function openMobileFullPlayer() {
+  if (!document.documentElement.classList.contains('android-app')) return;
+  const panel = $('#mobileFullPlayer');
+  if (!panel) return;
+  updateNowPlaying(currentTrack());
+  updatePlaybackProgress();
+  const shuffle = $('#mobileFullShuffleBtn');
+  if (shuffle) { shuffle.classList.toggle('active', !!state.shuffle); shuffle.style.color = state.shuffle ? 'var(--accent)' : ''; }
+  const repeat = $('#mobileFullRepeatBtn');
+  if (repeat) { repeat.classList.toggle('active', !!state.repeat); repeat.style.color = state.repeat ? 'var(--accent)' : ''; }
+  document.body.classList.add('mobile-full-player-open');
+  panel.setAttribute('aria-hidden', 'false');
+}
+function closeMobileFullPlayer() {
+  document.body.classList.remove('mobile-full-player-open');
+  $('#mobileFullPlayer')?.setAttribute('aria-hidden', 'true');
+}
+function bindMobileTrackSwipe(element) {
+  if (!element) return;
+  let start = null;
+  element.style.touchAction = 'pan-y';
+  element.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'mouse') return;
+    start = {x:event.clientX, y:event.clientY, id:event.pointerId};
+  }, {passive:true});
+  element.addEventListener('pointercancel', () => { start = null; }, {passive:true});
+  element.addEventListener('pointerup', event => {
+    if (!start || start.id !== event.pointerId) return;
+    const dx = event.clientX - start.x, dy = event.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) < 44 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    state._mobileSwipeAt = Date.now();
+    event.preventDefault();
+    event.stopPropagation();
+    if (dx < 0) void next(); else previous();
+  }, {passive:false});
+}
 function updateNowPlaying(t){
-  $('#nowTitle').textContent=t?.title || 'Ничего не играет'; $('#nowArtist').textContent=t?.artist || 'Выберите трек'; $('#nowAlbum').textContent=t?.album || ''; $('#miniCover').innerHTML=coverHtml(t?.cover,'',t?.remoteCover || '') || uiIcon('music');
+  const title = t?.title || 'Ничего не играет';
+  const artist = t?.artist || 'Выберите трек';
+  const album = t?.album || '';
+  const cover = coverHtml(t?.cover,'',t?.remoteCover || '') || uiIcon('music');
+  $('#nowTitle').textContent=title; $('#nowArtist').textContent=artist; $('#nowAlbum').textContent=album; $('#miniCover').innerHTML=cover;
+  const fullTitle=$('#mobileFullTitle'), fullArtist=$('#mobileFullArtist'), fullAlbum=$('#mobileFullAlbum'), fullCover=$('#mobileFullCover');
+  if(fullTitle) fullTitle.textContent=title;
+  if(fullArtist) fullArtist.textContent=artist;
+  if(fullAlbum) { fullAlbum.textContent=album; fullAlbum.hidden=!album; }
+  if(fullCover) { fullCover.innerHTML=cover; fullCover.setAttribute('aria-label', t?.title ? ('Обложка: '+t.title) : 'Обложка альбома'); }
+  const context=$('#mobileFullPlayerContext');
+  if(context) {
+    const playlist=state.playbackSource && state.playbackSource!=='library' ? findPlaylistById(state.playbackSource) : null;
+    context.textContent=playlist?.name || (state.playbackSource==='library' ? 'Моя музыка' : 'Очередь');
+  }
+  const status=$('#mobileFullPlaybackStatus');
+  if(status) status.textContent = album ? album : 'Localify Crimson';
 }
 function refreshPlayingStates() {
   const id=currentTrack()?.id||'';
