@@ -163,6 +163,8 @@ const DEFAULT_SETTINGS = {
   renameFiles: false,
   moveFilesIntoPlaylists: true,
   musicFolder: '',
+  downloadFolder: '',
+  downloadFolderLabel: '',
   ytDlpPath: 'yt-dlp',
   cookiesFile: '',
   proxy: '',
@@ -206,6 +208,9 @@ function normalizeSettings(raw){
   next.proxy = String(next.proxy || '').trim();
   next.downloadMode = next.downloadMode === 'original' ? 'original' : 'mp3';
   next.musicFolder = String(next.musicFolder || '');
+  next.downloadFolder = String(next.downloadFolder || '');
+  next.downloadFolderLabel = String(next.downloadFolderLabel || '');
+  next.moveFilesIntoPlaylists = false;
   next.autoWatch = next.autoWatch !== false;
   next.compactPlayer = next.compactPlayer === true;
   return next;
@@ -571,6 +576,11 @@ function findExistingDownloadedTrack(candidate, root) {
 function getMusicRoot(settings = safeReadSettings()) {
   return settings.musicFolder && fs.existsSync(settings.musicFolder) ? settings.musicFolder : app.getPath('music');
 }
+function getDownloadRoot(settings = safeReadSettings()) {
+  const selected = String(settings.downloadFolder || '').trim();
+  if (selected && fs.existsSync(selected)) return selected;
+  return path.join(getMusicRoot(settings), 'Localify Downloads');
+}
 // Брошенные папки .localify-ytdlp-* убираются, когда ни одна загрузка не идёт:
 // при старте приложения и перед первой загрузкой новой серии.
 function sweepStaleDownloadTempDirs(reason) {
@@ -582,7 +592,8 @@ function sweepStaleDownloadTempDirs(reason) {
 
 async function downloadYtDlpOnce(candidate) {
   const settings=safeReadSettings();
-  const root=getMusicRoot(settings);
+  const root=getDownloadRoot(settings);
+  await fs.promises.mkdir(root, { recursive: true });
   const existing=findExistingDownloadedTrack(candidate, root);
   if(existing) return { path: existing, title:candidate.title, artist:candidate.artist, album:candidate.album||'', sourceUrl:candidate.sourceUrl||'', provider:candidate.provider||'youtube', cover:candidate.cover||'', duplicate:true };
   const key=`${normalizePath(root)}::${canonicalYoutubeKey(candidate)}`;
@@ -686,6 +697,14 @@ ipcMain.handle('library:load', () => {
   }
   if (changed) { try { safeWriteStore(store); } catch {} }
   return store;
+});
+ipcMain.handle('downloads:chooseFolder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, { title: 'Выберите папку для скачанной музыки', properties: ['openDirectory', 'createDirectory'] });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const folder = result.filePaths[0];
+  const settings = { ...safeReadSettings(), downloadFolder: folder, downloadFolderLabel: folder };
+  if (!safeWriteSettings(settings)) throw new Error('Не удалось сохранить папку загрузок');
+  return { folder, displayName: folder };
 });
 ipcMain.handle('settings:get', () => safeReadSettings());
 ipcMain.handle('playback:loadSession', () => safeReadPlaybackState());
