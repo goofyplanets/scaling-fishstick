@@ -159,6 +159,9 @@ function setupAudioVisualizer() {
 
 
 function ensureAudioAnalyser() {
+  // Android WebView can silence media routed through a suspended or origin-tainted
+  // AudioContext. Keep Android audio on the direct HTMLMediaElement output path.
+  if (document.documentElement.classList.contains('android-app')) return null;
   if (!visualizer.canvas) setupAudioVisualizer();
   if (visualizer.analyser) return visualizer.analyser;
   try {
@@ -814,6 +817,17 @@ function setupDialogAccessibility() {
   $('#searchClear')?.addEventListener('click', () => { $('#search').value=''; state.search=''; closeSearchSuggestions(); renderAll(); $('#search').focus(); });
   $('#onlineSearchRetry')?.addEventListener('click', () => { if (state.search.trim()) void runOnlineSearch(state.search, true); });
   $('#sidebarToggle').addEventListener('click', toggleSidebar);
+  $('#mobileNavToggle')?.addEventListener('click', () => setMobileSidebarOpen(!document.body.classList.contains('mobile-sidebar-open')));
+  $('#mobileSearchToggle')?.addEventListener('click', () => setMobileSearchOpen(true));
+  $('#mobileSearchClose')?.addEventListener('click', () => setMobileSearchOpen(false));
+  $('.sidebar .nav-item').forEach(btn => btn.addEventListener('click', closeMobileSidebar));
+  document.addEventListener('click', e => {
+    if (document.body.classList.contains('mobile-sidebar-open') && !e.target.closest('.sidebar') && !e.target.closest('#mobileNavToggle')) closeMobileSidebar();
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('mobile-sidebar-open')) closeMobileSidebar();
+    if (e.key === 'Escape' && document.body.classList.contains('mobile-search-open')) setMobileSearchOpen(false);
+  });
   $('#chooseMusicFolder').addEventListener('click', chooseAndSetMusicFolder);
   $('#rescanMusicFolder').addEventListener('click', () => syncConfiguredLibrary(true));
   $('#openMusicFolder').addEventListener('click', async () => { const p = await window.localify.openLibraryFolder(); if(!p) toast('Папка библиотеки не выбрана'); });
@@ -911,6 +925,14 @@ function setupDialogAccessibility() {
     // Ссылка на поток YouTube могла устареть или отдать 403: один раз за трек
     // сбрасываем кэш и получаем свежую ссылку вместо тишины.
     const track = state.currentRemoteTrack;
+    if (document.documentElement.classList.contains('android-app') && (!track || track.provider !== 'youtube')) {
+      console.warn('Android audio playback error', {code: audio.error?.code, message: audio.error?.message, source: audio.currentSrc});
+      toast(track?.provider && track.provider !== 'youtube'
+        ? 'Не удалось загрузить онлайн-превью. Проверьте подключение к интернету.'
+        : 'Не удалось открыть аудиофайл. Попробуйте MP3, M4A или WAV.');
+      syncPlayButton(false);
+      return;
+    }
     if (!track || track._streamRetried) return;
     track._streamRetried = true;
     const key = `${track.provider}:${track.providerId||track.title+'::'+track.artist}`;
@@ -2326,6 +2348,24 @@ async function bindPlaylistDropTarget(el, playlistId){
 }
 
 function setupGlobalFileDrop(){const surface=$('.main');if(!surface)return;let depth=0;surface.addEventListener('dragenter',e=>{if([...e.dataTransfer.types].includes('Files')){depth++;surface.classList.add('file-drop-active');}});surface.addEventListener('dragleave',e=>{if([...e.dataTransfer.types].includes('Files')){depth=Math.max(0,depth-1);if(!depth)surface.classList.remove('file-drop-active');}});surface.addEventListener('dragover',e=>{if([...e.dataTransfer.types].includes('Files')){e.preventDefault();e.dataTransfer.dropEffect='copy';}});surface.addEventListener('drop',async e=>{if(![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();depth=0;surface.classList.remove('file-drop-active');const paths=[...(e.dataTransfer.files||[])].map(f=>window.localify.getPathForFile?window.localify.getPathForFile(f):(f.path||'')).filter(Boolean);if(!paths.length)return;try{const tracks=await (window.localify.importDroppedPaths?window.localify.importDroppedPaths(paths):window.localify.importDroppedFiles(paths));const before=state.library.length;await addTracks(tracks);if(state.settings.onlineMetadata)scheduleMetadataHydration(true);toast(`Добавлено: ${Math.max(0,state.library.length-before)} трек.`);}catch(err){console.error(err);toast('Не удалось добавить файлы');}});}
+
+function setMobileSidebarOpen(open) {
+  const shouldOpen = !!open;
+  if (shouldOpen) document.body.classList.remove('mobile-search-open');
+  document.body.classList.toggle('mobile-sidebar-open', shouldOpen);
+  const button = $('#mobileNavToggle');
+  if (button) { button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false'); button.setAttribute('aria-label', shouldOpen ? 'Закрыть боковую панель' : 'Открыть боковую панель'); }
+}
+function closeMobileSidebar() { setMobileSidebarOpen(false); }
+function setMobileSearchOpen(open) {
+  const shouldOpen = !!open;
+  if (shouldOpen) document.body.classList.remove('mobile-sidebar-open');
+  document.body.classList.toggle('mobile-search-open', shouldOpen);
+  if (shouldOpen) {
+    const input = $('#search');
+    window.setTimeout(() => { try { input?.focus({ preventScroll: true }); } catch { input?.focus(); } }, 40);
+  } else { closeSearchSuggestions(); $('#search')?.blur(); }
+}
 
 function applySidebar(){
   document.body.classList.toggle('sidebar-collapsed', !!state.sidebarCollapsed);

@@ -361,7 +361,11 @@ public class LocalifyAndroidBridge {
             InputStream in = activity.getContentResolver().openInputStream(source);
             if (in == null) return response(404, "Not Found", "text/plain", new byte[0]);
             String mime = activity.getContentResolver().getType(source);
-            if (mime == null || !mime.startsWith("audio/")) mime = guessMime(source.toString());
+            if (mime == null || !mime.toLowerCase(Locale.ROOT).startsWith("audio/") || "application/octet-stream".equalsIgnoreCase(mime)) {
+                String inferred = guessMime(queryDisplayName(source));
+                if (inferred.startsWith("audio/")) mime = inferred;
+                else if (mime == null || !mime.toLowerCase(Locale.ROOT).startsWith("audio/")) mime = "audio/mpeg";
+            }
             String range = findHeader(headers, "Range");
             long totalLength = querySize(source);
             if (range != null && range.startsWith("bytes=") && totalLength > 0) {

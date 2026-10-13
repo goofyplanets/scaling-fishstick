@@ -44,3 +44,5 @@ html.android-app label:has(#settingStartMinimized),
 html.android-app label:has(#settingAutoWatch),
 html.android-app label:has(#settingMoveFilesIntoPlaylists),
 html.android-app label:has(#settingRenameFiles) { display:none !important; }
+
+@import url('./styles/android-mobile-fixes.css');
