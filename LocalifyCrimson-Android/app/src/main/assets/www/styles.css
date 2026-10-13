@@ -1,0 +1,46 @@
+@import url('./styles/home-dashboard.css');
+@import url('./styles/tokens-base.css');
+@import url('./styles/responsive.css');
+@import url('./styles/interaction.css');
+@import url('./styles/layout.css');
+@import url('./styles/layout-overrides.css');
+@import url('./styles/features.css');
+@import url('./styles/crimson.css');
+
+.library-match{font-size:12px;color:var(--text-muted,#aa999e);margin:5px 0 2px}.radio-tags{line-height:1.5}
+
+.np-album{opacity:.65;display:block;font-size:11px}.queue-item .queue-actions{margin-left:auto;display:flex;gap:6px}.queue-action{border:0;background:transparent;color:var(--text-muted);cursor:pointer}.library-tabs{display:flex;gap:6px;margin:-2px 0 18px;padding:4px;border:1px solid var(--line);border-radius:12px;width:max-content;background:#1a1112}.library-tab{border:0;background:transparent;color:#9e898b;border-radius:9px;padding:8px 14px;font-weight:900;cursor:pointer}.library-tab.active{background:#291b1d;color:#fff;box-shadow:inset 0 0 0 1px #433032}.album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:15px}.album-card{background:#141013;border:1px solid var(--line);border-radius:15px;padding:12px;cursor:pointer;outline:none;transition:.18s transform,.18s background,.18s border-color}.album-card:hover,.album-card:focus-visible{background:#211718;transform:translateY(-3px);border-color:#4b3538}.album-cover{aspect-ratio:1;border-radius:10px;background:linear-gradient(135deg,#3b282a,#1c1314);display:grid;place-items:center;color:#90787b;font-size:38px;overflow:hidden}.album-cover img,.album-detail-cover img{width:100%;height:100%;object-fit:cover}.album-card-copy{padding-top:10px;min-width:0}.album-card-copy b,.album-card-copy small,.album-card-copy span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.album-card-copy small{color:#baa8aa;margin-top:3px}.album-card-copy span{color:#846f71;font-size:11px;margin-top:5px}.album-detail-head{display:grid;gap:18px}.album-detail-main{display:flex;align-items:center;gap:18px;padding:18px;border:1px solid var(--line);border-radius:18px;background:#141013}.album-detail-cover{width:170px;height:170px;flex:0 0 170px;border-radius:13px;background:#241a1e;display:grid;place-items:center;color:#937d80;font-size:42px;overflow:hidden}.album-detail-main h2{margin:6px 0 5px;font-size:30px}.album-detail-main p{margin:0 0 14px;color:var(--muted)}.album-empty{grid-column:1/-1}.duplicate-quality{font-size:10px;color:#a38d90;min-width:110px;text-align:right}.duplicate-preferred{background:rgba(224,31,44,.045)}.duplicate-copy em{font-style:normal;font-size:10px;color:var(--accent);margin-left:5px}.setting-switch{display:flex!important;align-items:center;gap:10px;color:#bfb1b3!important;font-weight:700!important}.setting-switch input{width:auto!important;margin:0!important}@media(max-width:780px){.album-detail-main{align-items:flex-start;flex-direction:column}.album-detail-cover{width:130px;height:130px;flex-basis:130px}.album-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Native Android touch layout. The original Crimson desktop theme remains intact. */
+html.android-app, html.android-app body { height:100%; min-height:100%; overscroll-behavior-y:contain; }
+html.android-app body { -webkit-tap-highlight-color: transparent; }
+html.android-app button, html.android-app input, html.android-app select, html.android-app textarea { font-size: max(14px, 1em); }
+html.android-app button { min-height: 40px; touch-action: manipulation; }
+html.android-app .provider-settings label:has(#settingYtDlpPath),
+html.android-app .provider-settings label:has(#settingCookiesFile) { display:none !important; }
+html.android-app #chooseYtDlp, html.android-app #chooseCookiesFile, html.android-app #updateYtDlp { display:none !important; }
+html.android-app .folder-actions { flex-wrap:wrap; }
+@media (max-width: 780px) {
+  html.android-app body { overflow-x:hidden; }
+  html.android-app .main, html.android-app .content, html.android-app .view { min-width:0; }
+  html.android-app .modal { max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow:auto; }
+  html.android-app .topbar { padding-top:max(8px, env(safe-area-inset-top)); }
+  html.android-app .player-bar, html.android-app .bottom-player { padding-bottom:max(8px, env(safe-area-inset-bottom)); }
+  html.android-app .library-row, html.android-app .track-row { min-height:54px; }
+}
+
+html.android-app .android-only-card { display:block !important; }
+html.android-app .android-desktop-provider { display:none !important; }
+html:not(.android-app) .android-only-card { display:none !important; }
+
+html.android-app .window-actions { display:none !important; }
+html.android-app .windowbar { min-height:36px; }
+
+html.android-app label:has(#settingMinimizeToTray),
+html.android-app label:has(#settingCloseToTray),
+html.android-app label:has(#settingTrayEnabled),
+html.android-app label:has(#settingStartMinimized),
+html.android-app label:has(#settingAutoWatch),
+html.android-app label:has(#settingMoveFilesIntoPlaylists),
+html.android-app label:has(#settingRenameFiles) { display:none !important; }

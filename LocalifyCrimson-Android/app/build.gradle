@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.localify.crimson'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.localify.crimson'
+        minSdk 26
+        targetSdk 34
+        versionCode 10101
+        versionName '1.1.1-android-preview'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug { applicationIdSuffix '.debug' }
+    }
+}
