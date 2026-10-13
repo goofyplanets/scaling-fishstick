@@ -241,7 +241,7 @@ public class LocalifyAndroidBridge {
     private void takePersistable(Uri uri, Intent data) {
         try {
             int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            activity.getContentResolver().takePersistableUriPermission(uri, flags & Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            activity.getContentResolver().takePersistableUriPermission(uri, flags & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
         } catch (Exception ignored) {}
     }
 
@@ -761,10 +761,10 @@ public class LocalifyAndroidBridge {
 
     private JSONObject publishDownloadedAudio(File downloaded, JSONObject source) throws Exception {
         if (downloaded == null || !downloaded.isFile() || downloaded.length() <= 0) {
-            throw new IOException("yt-dlp не создал MP3-файл");
+            throw new IOException("yt-dlp не создал аудиофайл");
         }
         String extension = stripExtension(downloaded.getName()).equals(downloaded.getName()) ? "mp3" : downloaded.getName().substring(downloaded.getName().lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
-        if (!extension.matches("mp3|m4a|opus|webm|aac")) extension = "mp3";
+        if (!extension.matches("mp3|m4a|opus|webm|aac|ogg")) extension = "mp3";
         String name = safeDownloadName(source.optString("title", stripExtension(downloaded.getName()))) + "." + extension;
         Uri resultUri;
         ContentResolver resolver = activity.getContentResolver();
@@ -852,7 +852,7 @@ public class LocalifyAndroidBridge {
             try {
                 ensureYtDlpInitialized();
                 JSONObject savedSettings = readJsonFile("settings.json", defaultSettings());
-                boolean originalAudio = "original".equalsIgnoreCase(savedSettings.optString("downloadMode", "mp3"));
+                boolean originalAudio = "original".equalsIgnoreCase(savedSettings.optString("downloadMode", "original")) || "m4a".equalsIgnoreCase(savedSettings.optString("downloadMode", ""));
                 workDir = new File(activity.getCacheDir(), "yt-dlp-" + callbackId + "-" + System.currentTimeMillis());
                 if (!workDir.mkdirs() && !workDir.isDirectory()) throw new IOException("Не удалось создать временную папку загрузки");
                 File outputTemplate = new File(workDir, "%(title).150B.%(ext)s");
