@@ -593,6 +593,7 @@ public class LocalifyAndroidBridge {
         }
         ytDlpExecutor.execute(() -> {
             JSONArray results = new JSONArray();
+            String failure = null;
             try {
                 ensureYtDlpInitialized();
                 String searchUrl = "ytsearch" + limit + ":" + query.replace("\n", " ").replace("\r", " ");
@@ -600,6 +601,7 @@ public class LocalifyAndroidBridge {
                 request.addOption("--flat-playlist");
                 request.addOption("--dump-json");
                 request.addOption("--no-warnings");
+                request.addOption("--no-update");
                 request.addOption("--ignore-errors");
                 request.addOption("--skip-download");
                 request.addOption("--socket-timeout", "10");
@@ -645,8 +647,9 @@ public class LocalifyAndroidBridge {
                 }
             } catch (Exception ex) {
                 Log.w(TAG, "Built-in yt-dlp search failed", ex);
+                failure = ex.getMessage() == null ? "yt-dlp search failed" : ex.getMessage();
             }
-            finishCallback(callbackId, results, null);
+            finishCallback(callbackId, results, failure);
         });
     }
 
@@ -664,6 +667,7 @@ public class LocalifyAndroidBridge {
                 request.addOption("-f", "bestaudio/best");
                 request.addOption("--no-playlist");
                 request.addOption("--no-warnings");
+                request.addOption("--no-update");
                 request.addOption("--socket-timeout", "10");
                 request.addOption("--extractor-retries", "1");
                 VideoInfo info = YoutubeDL.getInstance().getInfo(request);
@@ -800,6 +804,9 @@ public class LocalifyAndroidBridge {
                 request.addOption("--convert-thumbnails", "jpg");
                 request.addOption("--no-playlist");
                 request.addOption("--newline");
+                request.addOption("--no-update");
+                request.addOption("--socket-timeout", "10");
+                request.addOption("--extractor-retries", "1");
                 request.addOption("-o", outputTemplate.getAbsolutePath());
                 YoutubeDLResponse response = YoutubeDL.getInstance().execute(request, null, (progress, eta, line) -> {
                     float percentage = progress == null ? 0f : progress.floatValue();
