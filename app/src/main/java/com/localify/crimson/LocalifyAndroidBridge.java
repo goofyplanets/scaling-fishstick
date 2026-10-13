@@ -489,15 +489,25 @@ public class LocalifyAndroidBridge {
         JSONObject payload = parseObject(raw); boolean playing = payload.optBoolean("playing", false);
         Intent intent = new Intent(activity, PlaybackService.class);
         intent.setAction(playing ? PlaybackService.ACTION_PLAYING : PlaybackService.ACTION_PAUSED);
-        putIntentExtra(intent, "title", payload.optString("title", "Localify Crimson"));
-        putIntentExtra(intent, "artist", payload.optString("artist", ""));
+        putMediaExtras(intent, payload);
         if (playing) { if (Build.VERSION.SDK_INT >= 26) activity.startForegroundService(intent); else activity.startService(intent); }
         else activity.startService(intent);
     }
     @JavascriptInterface public void nowPlaying(String raw) {
-        JSONObject payload = parseObject(raw); Intent intent = new Intent(activity, PlaybackService.class); intent.setAction(PlaybackService.ACTION_METADATA);
-        putIntentExtra(intent, "title", payload.optString("title", "Localify Crimson")); putIntentExtra(intent, "artist", payload.optString("artist", "")); putIntentExtra(intent, "album", payload.optString("album", ""));
+        JSONObject payload = parseObject(raw);
+        Intent intent = new Intent(activity, PlaybackService.class);
+        intent.setAction(PlaybackService.ACTION_METADATA);
+        putMediaExtras(intent, payload);
         try { activity.startService(intent); } catch (Exception ignored) {}
+    }
+    private void putMediaExtras(Intent intent, JSONObject payload) {
+        putIntentExtra(intent, "title", payload.optString("title", "Localify Crimson"));
+        putIntentExtra(intent, "artist", payload.optString("artist", ""));
+        putIntentExtra(intent, "album", payload.optString("album", ""));
+        putIntentExtra(intent, "sourcePath", payload.optString("sourcePath", ""));
+        putIntentExtra(intent, "cover", payload.optString("cover", ""));
+        intent.putExtra("duration", payload.optDouble("duration", 0));
+        intent.putExtra("position", payload.optDouble("position", 0));
     }
     private void putIntentExtra(Intent intent, String key, String value) { intent.putExtra(key, value == null ? "" : value); }
 

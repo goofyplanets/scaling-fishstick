@@ -44,21 +44,6 @@ const state = {
   search: '', genre: '',
   searchMode: localStorage.getItem('localify.searchMode') === 'online' ? 'online' : 'local',
   genreCollapsed: localStorage.getItem('localify.genreCollapsed') === '1',
-  radioStations: [],
-  radioLoading: false,
-  radioCurrentStation: null,
-  radioQuery: '',
-  radioMode: localStorage.getItem('localify.radioMode') || 'all',
-  radioOnlineResults: [],
-  radioLocalResults: [],
-  radioRecentLocalIds: [],
-  radioOnlineLoading: false,
-  radioAutoLoading: false,
-  radioAutoReady: false,
-  radioAutoStep: 0,
-  radioAutoTotal: 0,
-  radioAutoStage: '',
-  radioScope: localStorage.getItem('localify.radioScope') || 'all',
   onlineSearchResults: [],
   onlineSearchLoading: false,
   currentView: 'home',
@@ -681,32 +666,6 @@ function setupDialogAccessibility() {
 
   $$('.nav-item').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   $('#genreToggle')?.addEventListener('click', () => setGenreCollapsed(!state.genreCollapsed));
-  $('#radioSearchBtn')?.addEventListener('click', () => runRadioSearch($('#radioSearch')?.value || ''));
-  $('#radioPlayBtn')?.addEventListener('click', startRadioMix);
-  $('#radioRefreshBtn')?.addEventListener('click', async () => {
-    const input=$('#radioSearch');
-    if(input) input.value='';
-    state.radioQuery='';
-    state.radioAutoReady=false;
-    state.radioOnlineResults=[];
-    renderRadio();
-    if(radioSourceTracks().length) await buildAutoRadioMix();
-    else toast(state.radioScope==='all' ? 'Добавьте музыку в библиотеку для построения радио' : 'В выбранном плейлисте нет локальных треков');
-  });
-  $('#radioSearch')?.addEventListener('input', e => { state.radioQuery=e.currentTarget.value || ''; renderRadio(); });
-  $('#radioSearch')?.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); runRadioSearch(e.currentTarget.value || ''); } });
-  $$('#radioSourceTabs [data-radio-mode]').forEach(btn => btn.addEventListener('click', () => {
-    state.radioMode=btn.dataset.radioMode || 'all';
-    localStorage.setItem('localify.radioMode', state.radioMode);
-    renderRadio();
-    // The Online tab is intentionally driven by the local collection.
-    // No manual query is needed: the current radio scope (whole library or
-    // selected playlist) becomes the taste profile for online discovery.
-    if(state.radioMode==='online' && !state.radioQuery && !state.radioAutoReady && !state.radioAutoLoading && radioSourceTracks().length){
-      void buildAutoRadioMix();
-    }
-  }));
-  $('#radioScope')?.addEventListener('change', e => { state.radioScope=e.currentTarget.value || 'all'; localStorage.setItem('localify.radioScope', state.radioScope); state.radioAutoReady=false; state.radioOnlineResults=[]; state.radioLocalResults=[]; renderRadio(); });
   const searchInput = $('#search');
   $('#searchModeLocal')?.addEventListener('click', () => setSearchMode('local'));
   $('#searchModeOnline')?.addEventListener('click', () => setSearchMode('online'));
@@ -758,7 +717,7 @@ function setupDialogAccessibility() {
     // показываем ту же заглушку, что и у трека без обложки. Так «пропавшая»
     // обложка (удалённый файл кэша, обрезанная загрузка) видна сразу.
     if(img.dataset.coverFailed) return;
-    if(!img.closest('.row-cover,.card-cover,.queue-cover,.search-result-cover,.album-cover,.album-detail-cover,.duplicate-cover,.online-cover,.radio-logo,.mini-cover,.home-resume-cover,.popover-cover,.side-playlist-cover,.playlist-detail-cover')) return;
+    if(!img.closest('.row-cover,.card-cover,.queue-cover,.search-result-cover,.album-cover,.album-detail-cover,.duplicate-cover,.online-cover,.mini-cover,.home-resume-cover,.popover-cover,.side-playlist-cover,.playlist-detail-cover')) return;
     img.dataset.coverFailed='1';
     img.classList.add('cover-broken');
     const holder=img.parentElement;
@@ -954,9 +913,9 @@ function setupDialogAccessibility() {
     const analyser = ensureAudioAnalyser();
     analyser && visualizer.audioContext?.state === 'suspended' && visualizer.audioContext.resume().catch(() => {});
     startVisualizerLoop();
-    syncPlayButton(true); refreshPlayingStates(); window.localify.playback.updateState({ title: currentTrack()?.title || 'Localify Crimson', artist: currentTrack()?.artist || '', playing: true }); schedulePlaybackPersist();
+    syncPlayButton(true); refreshPlayingStates(); window.localify.playback.updateState(nativePlaybackPayload(true)); schedulePlaybackPersist();
   });
-  audio.addEventListener('pause', () => { stopVisualizerLoop(); syncPlayButton(false); refreshPlayingStates(); window.localify.playback.updateState({ playing: false }); persistPlaybackSession(true); });
+  audio.addEventListener('pause', () => { stopVisualizerLoop(); syncPlayButton(false); refreshPlayingStates(); window.localify.playback.updateState(nativePlaybackPayload(false)); persistPlaybackSession(true); });
   audio.addEventListener('error', () => {
     // Ссылка на поток YouTube могла устареть или отдать 403: один раз за трек
     // сбрасываем кэш и получаем свежую ссылку вместо тишины.
@@ -1265,220 +1224,6 @@ function setGenreCollapsed(collapsed){
   if(btn){ btn.setAttribute('aria-expanded', state.genreCollapsed ? 'false' : 'true'); btn.title=state.genreCollapsed?'Развернуть жанры':'Свернуть жанры'; btn.setAttribute('aria-label',btn.title); btn.textContent=state.genreCollapsed?'⌄':'⌃'; }
 }
 
-const RADIO_SEED_COUNT = 12;
-const RADIO_ONLINE_TARGET = 28;
-const RADIO_LOCAL_TARGET = 28;
-
-function radioScopeLabel(){
-  if(state.radioScope==='all') return 'Вся моя музыка';
-  const p=findPlaylistById(state.radioScope);
-  return p ? `Плейлист: ${p.name}` : 'Вся моя музыка';
-}
-function radioSourceTracks(){
-  if(state.radioScope==='all') return [...state.library];
-  const p=findPlaylistById(state.radioScope);
-  if(!p) return [...state.library];
-  const ids=new Set(p.trackIds||[]);
-  return state.library.filter(t=>ids.has(t.id));
-}
-function radioLocalTrackList(){
-  const q=String(state.radioQuery||'').trim();
-  const source=radioSourceTracks();
-  if(!q) return source.sort((a,b)=>(Number(b.addedAt)||0)-(Number(a.addedAt)||0));
-  const needle=q.toLocaleLowerCase();
-  return source.filter(t=>[t.title,t.artist,t.album,t.genre].filter(Boolean).some(v=>String(v).toLocaleLowerCase().includes(needle)));
-}
-function radioShuffle(list){
-  const a=[...list]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a;
-}
-function radioPickLocalTracks(source, count){
-  const unique=[];
-  const seen=new Set();
-  for(const t of source){
-    const key=String(t?.id||`${t?.path||''}|${t?.title||''}|${t?.artist||''}`);
-    if(!key || seen.has(key)) continue;
-    seen.add(key);
-    unique.push(t);
-  }
-  const recent=new Set(state.radioRecentLocalIds||[]);
-  const fresh=radioShuffle(unique.filter(t=>!recent.has(String(t.id))));
-  const fallback=radioShuffle(unique.filter(t=>recent.has(String(t.id))));
-  const picked=[...fresh,...fallback].slice(0, Math.min(count, unique.length));
-  state.radioRecentLocalIds=picked.map(t=>String(t.id));
-  return picked;
-}
-function radioSeeds(){
-  const source=radioSourceTracks();
-  return radioShuffle(source).slice(0, Math.min(RADIO_SEED_COUNT, source.length));
-}
-function radioSeedQueries(seeds){
-  // Online recommendations are built from the actual local library, not from
-  // a manually entered online query. Use concrete local tracks first, then
-  // broaden with artists/genres so the result follows the user's collection.
-  const queries=[];
-  const clean=(v)=>String(v||'').trim();
-  for(const seed of radioShuffle(seeds).slice(0,5)){
-    const artist=clean(seed.artist), title=clean(seed.title);
-    if(artist && title) queries.push(`${artist} ${title} similar music`);
-    else if(artist) queries.push(`${artist} similar music`);
-    else if(title) queries.push(`${title} similar music`);
-  }
-  const artists=[...new Set(seeds.map(t=>clean(t.artist)).filter(Boolean))];
-  const genres=[...new Set(seeds.map(t=>clean(t.genre)).filter(g=>g && !/^music$/i.test(g) && !/^(unknown|other|misc)/i.test(g)))];
-  for(const artist of radioShuffle(artists).slice(0,2)) queries.push(`${artist} similar artists music`);
-  for(const genre of radioShuffle(genres).slice(0,2)) queries.push(`${genre} music similar artists`);
-  return [...new Set(queries)].slice(0,8);
-}
-async function buildAutoRadioMix(){
-  const source=radioSourceTracks();
-  if(!source.length){ toast(state.radioScope==='all' ? 'Добавьте хотя бы несколько локальных треков для построения радио' : 'В выбранном плейлисте нет локальных треков'); return []; }
-  if(state.radioAutoLoading) return state.radioOnlineResults||[];
-  state.radioAutoLoading=true; state.radioAutoReady=false; state.radioOnlineResults=[]; state.radioQuery=''; state.radioAutoStep=0; state.radioAutoStage='Выбираю характер музыки'; renderRadio();
-  try{
-    const seeds=radioSeeds();
-    state.radioLocalResults=radioPickLocalTracks(source, RADIO_LOCAL_TARGET);
-    const queries=radioSeedQueries(seeds);
-    state.radioAutoTotal=Math.max(queries.length,1);
-    const found=[];
-    const seen=new Set(state.onlineLibraryKeys||[]);
-    renderRadio();
-    for(const q of queries){
-      if(found.length>=RADIO_ONLINE_TARGET) break;
-      state.radioAutoStep++;
-      state.radioAutoStage=`Ищу похожую музыку (${state.radioAutoStep}/${state.radioAutoTotal})`;
-      renderRadio();
-      try{
-        const results=await window.localify.providers.onlineSearch({
-          query:q, limit:Math.min(10, RADIO_ONLINE_TARGET-found.length),
-          localLibrary:source.map(t=>({title:t.title,artist:t.artist,provider:t.provider,providerId:t.providerId}))
-        });
-        for(const item of filterOnlineResults(results||[])){
-          const key=canonicalOnlineTrackKey(item)||`${item?.provider||'remote'}:${item?.providerId||item?.sourceUrl||item?.title}`;
-          if(seen.has(key)) continue;
-          seen.add(key); found.push({...item,id:item.id||`remote:youtube:${item.providerId||item.sourceUrl||item.title}`});
-          if(found.length>=RADIO_ONLINE_TARGET) break;
-        }
-      }catch(err){ console.warn('Radio query failed:',q,err); }
-    }
-    state.radioAutoStage='Формирую очередь'; state.radioAutoStep=state.radioAutoTotal; renderRadio();
-    state.radioOnlineResults=radioShuffle(found).slice(0,RADIO_ONLINE_TARGET);
-    state.radioAutoReady=state.radioOnlineResults.length>0;
-    if(!state.radioAutoReady) toast('Не удалось найти онлайн-треки. Проверьте yt-dlp и интернет-соединение.');
-    return state.radioOnlineResults;
-  } finally { state.radioAutoLoading=false; state.radioAutoStage=''; renderRadio(); }
-}
-function radioLocalCard(track){
-  const id=esc(track.id);
-  const playing=currentTrack()?.id===track.id && !audio.paused;
-  const cover=coverHtml(track.cover,'',track.remoteCover||'');
-  const meta=[track.artist||'Неизвестный исполнитель',track.album||'Локальная библиотека'].join(' · ');
-  return `<article class="radio-card ${playing?'playing':''}"><div class="radio-logo">${cover || uiIcon('music')}</div><div class="radio-copy"><span class="radio-provider">Моя музыка</span><b title="${esc(track.title||'Без названия')}">${esc(track.title||'Без названия')}</b><small title="${esc(meta)}">${esc(meta)}</small><div class="radio-tags">${esc(track.genre||'Локальный трек')}</div></div><button class="radio-play" type="button" data-radio-local-play="${id}" aria-label="${playing?'Пауза':'Воспроизвести'}" title="${playing?'Пауза':'Воспроизвести'}">${playing?'<svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.5" height="14" rx="1.2"/><rect x="13.5" y="5" width="3.5" height="14" rx="1.2"/></svg>':'<svg viewBox="0 0 24 24"><path d="M8.5 5.2 18 12l-9.5 6.8V5.2Z"/></svg>'}</button></article>`;
-}
-function radioOnlineCard(track,index){
-  const playing=(currentTrack()?.provider===track.provider || (!window.__LOCALIFY_ANDROID__ && currentTrack()?.provider==='youtube')) && currentTrack()?.providerId===track.providerId && !audio.paused;
-  return `<article class="radio-card radio-card-online ${playing?'playing':''}"><div class="radio-logo">${coverHtml(track.cover) || uiIcon('play')}</div><div class="radio-copy"><span class="radio-provider">${track.provider==='itunes'?'iTunes Preview':'YouTube'}</span><b title="${esc(track.title||'Без названия')}">${esc(track.title||'Без названия')}</b><small title="${esc(track.artist||'YouTube')}">${esc(track.artist||'YouTube')}${track.duration?` · ${fmtTime(track.duration)}`:''}</small><div class="radio-tags">Онлайн · ${esc(libraryMatchLabel(track))}</div><div class="radio-online-actions"><button type="button" class="primary small-btn" data-radio-online-play="${index}">${uiIcon(playing?'pause':'play')} ${playing?'Пауза':'Слушать'}</button><button type="button" class="secondary small-btn" data-radio-online-download="${index}">${uiIcon('download')} Скачать</button></div></div></article>`;
-}
-function renderRadio(){
-  const root=$('#radioGrid'); if(!root)return;
-  const q=String(state.radioQuery||'').trim();
-  const local=state.radioMode==='online' ? [] : (!q && state.radioAutoReady && state.radioLocalResults.length ? [...state.radioLocalResults] : radioLocalTrackList());
-  const online=state.radioMode==='local' ? [] : (state.radioOnlineResults||[]);
-  const status=$('#radioStatus');
-  if(status){
-    if(state.radioAutoLoading){
-      const total=state.radioAutoTotal||1, step=Math.min(state.radioAutoStep||0,total);
-      status.innerHTML=`<span class="radio-status-main">${esc(state.radioAutoStage||'Подбираю музыку…')}</span><span class="radio-status-sub">Основа: ${esc(radioScopeLabel())} · ${step}/${total} · найдено онлайн: ${state.radioOnlineResults.length}</span><span class="radio-progress"><i style="width:${Math.max(6,Math.round(step/total*100))}%"></i></span>`;
-    } else if(state.radioOnlineLoading) status.textContent='Ищу музыку онлайн…';
-    else if(q) status.textContent=`Моя музыка: ${local.length} · Онлайн: ${online.length}`;
-    else if(state.radioAutoReady) status.textContent=`Онлайн-подборка готова на основе «${radioScopeLabel()}» · ${fmtCount(state.radioOnlineResults.length,'трек','трека','треков')}`;
-    else status.textContent=`Онлайн-подборка будет собрана автоматически на основе «${radioScopeLabel()}»: ${fmtCount(RADIO_SEED_COUNT,'случайный локальный трек','случайных локальных трека','случайных локальных треков')} определят музыкальный профиль.`;
-  }
-  const scope=$('#radioScope');
-  if(scope){
-    const current=state.radioScope;
-    scope.innerHTML=`<option value="all">Вся моя музыка (${state.library.length})</option>`+state.playlists.map(p=>{const count=(p.trackIds||[]).filter(id=>state.trackById.has(id)).length;return `<option value="${esc(p.id)}">${esc(p.name)} (${count})</option>`}).join('');
-    scope.value=state.playlists.some(p=>p.id===current)?current:'all';
-    if(scope.value!==state.radioScope){state.radioScope='all';localStorage.setItem('localify.radioScope','all');}
-    scope.disabled=state.radioAutoLoading;
-  }
-  $$('#radioSourceTabs [data-radio-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.radioMode===state.radioMode));
-  const play=$('#radioPlayBtn');
-  if(play){
-    const canBuildAuto=!q && radioSourceTracks().length>0;
-    play.disabled=state.radioAutoLoading || !(local.length||online.length||canBuildAuto);
-    play.innerHTML=state.radioAutoLoading ? '<span class="radio-spinner"></span> Подбираю музыку…' : uiIcon('play') + ' Запустить радио';
-    play.classList.toggle('is-loading',state.radioAutoLoading);
-  }
-  if(state.radioOnlineLoading){ root.innerHTML=`<div class="radio-section-label">ОНЛАЙН</div><div class="radio-empty">Ищу через YouTube / yt-dlp…</div>`; return; }
-  const parts=[];
-  if(local.length) parts.push(`<div class="radio-section-label">МОЯ МУЗЫКА <span>${local.length}</span></div>${local.slice(0,100).map(radioLocalCard).join('')}`);
-  if(online.length) parts.push(`<div class="radio-section-label">ОНЛАЙН <span>${online.length}</span></div>${online.slice(0,30).map((t,i)=>radioOnlineCard(t,i)).join('')}`);
-  root.innerHTML=parts.length ? parts.join('') : `<div class="radio-empty">${q?'Ничего не найдено. Попробуйте другое название, исполнителя или альбом.':'Добавьте музыку в библиотеку или введите запрос для поиска онлайн.'}</div>`;
-  $$('#radioGrid [data-radio-local-play]').forEach(btn=>btn.addEventListener('click',()=>{
-    const list=radioLocalTrackList(); const idx=list.findIndex(t=>String(t.id)===String(btn.dataset.radioLocalPlay)); if(idx>=0) startPlayback(list,idx,'radio');
-  }));
-  $$('#radioGrid [data-radio-online-play]').forEach(btn=>btn.addEventListener('click',()=>{
-    const track=state.radioOnlineResults[Number(btn.dataset.radioOnlinePlay)]; if(track) playRemoteTrack(track);
-  }));
-  $$('#radioGrid [data-radio-online-download]').forEach(btn=>btn.addEventListener('click',()=>{
-    const track=state.radioOnlineResults[Number(btn.dataset.radioOnlineDownload)]; if(track) downloadRecommendation(track);
-  }));
-}
-async function runRadioSearch(query=''){
-  state.radioQuery=String(query||'').trim();
-  const q=state.radioQuery;
-  state.radioOnlineResults=[];
-  if(q && state.radioMode!=='local'){
-    state.radioOnlineLoading=true; renderRadio();
-    try{
-      const cacheKey=`radio::${q.toLocaleLowerCase()}::18`;
-      const cached=getOnlineCache(cacheKey);
-      if(cached && Date.now()-cached.at<5*60*1000) state.radioOnlineResults=filterOnlineResults(cached.results).map(t=>({...t,id:t.id||`remote:youtube:${t.providerId||t.sourceUrl||t.title}`}));
-      else {
-        const results=await window.localify.providers.onlineSearch({query:q,limit:18,localLibrary:state.library.map(t=>({title:t.title,artist:t.artist,provider:t.provider,providerId:t.providerId}))});
-        state.radioOnlineResults=filterOnlineResults(results||[]).map(t=>({...t,id:t.id||`remote:youtube:${t.providerId||t.sourceUrl||t.title}`}));
-        setOnlineCache(cacheKey,{at:Date.now(),results:state.radioOnlineResults});
-      }
-    }catch(err){ console.error(err); toast(err?.message||'Не удалось выполнить онлайн-поиск'); }
-    finally{ state.radioOnlineLoading=false; }
-  }
-  renderRadio();
-  if(state.currentView!=='radio') setView('radio');
-}
-async function startRadioMix(){
-  // With no manual search the radio is an automatic hybrid: it samples a small
-  // part of the local library to infer the user's taste, discovers online tracks,
-  // then shuffles both sources into one queue.
-  if(!state.radioQuery){
-    if(!state.radioAutoReady || !state.radioOnlineResults.length) await buildAutoRadioMix();
-    const source=radioSourceTracks();
-    const local=(state.radioLocalResults?.length ? [...state.radioLocalResults] : radioPickLocalTracks(source, RADIO_LOCAL_TARGET)).filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i).slice(0,RADIO_LOCAL_TARGET);
-    const online=radioShuffle(state.radioOnlineResults||[]).filter((t,i,a)=>a.findIndex(x=>(x.id||x.providerId||x.sourceUrl) === (t.id||t.providerId||t.sourceUrl))===i).slice(0,RADIO_ONLINE_TARGET);
-    const list=radioShuffle([...local,...online]);
-    if(!list.length){ toast('Нет треков для радио'); return; }
-    const chosen=list[0];
-    const built=playbackQueue.build(list,{shuffle:true,currentId:chosen.id});
-    state.playbackSource='radio'; state.playbackBase=[...list]; state.playback=built.items; state.playbackIndex=built.index;
-    state.shuffleMode='normal'; state.shuffle=true;
-    updateShuffleUI(); updateQueueButton();
-    playCurrentPlayback();
-    toast(`Авторадио: ${local.length} локальных + ${online.length} онлайн`);
-    return;
-  }
-  const local=state.radioMode==='online' ? [] : radioLocalTrackList();
-  const online=(state.radioMode==='local' ? [] : (state.radioOnlineResults||[]));
-  const localUnique=local.filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i);
-  const onlineUnique=online.filter((t,i,a)=>a.findIndex(x=>(x.id||x.providerId||x.sourceUrl)===(t.id||t.providerId||t.sourceUrl))===i);
-  const list=radioShuffle([...localUnique,...onlineUnique]);
-  if(!list.length){ toast('Нет треков для радио'); return; }
-  const chosen=list[0];
-  const built=playbackQueue.build(list,{shuffle:true,currentId:chosen.id});
-  state.playbackSource='radio'; state.playbackBase=[...list]; state.playback=built.items; state.playbackIndex=built.index;
-  state.shuffleMode='normal'; state.shuffle=true;
-  updateShuffleUI(); updateQueueButton(); playCurrentPlayback();
-  toast(`Радио: ${fmtCount(list.length,'трек','трека','треков')}${online.length?' · включая онлайн':''}`);
-}
-
 function setView(view) {
   state.currentView = view;
   $$('.nav-item').forEach(b => { const active = b.dataset.view === view; b.classList.toggle('active', active); if (active) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -1486,7 +1231,6 @@ function setView(view) {
   $(`#${view}View`).classList.add('active-view');
   renderAll();
   if (view === 'settings') { renderSettings(); void refreshLogsPreview(); }
-  if (view === 'radio') renderRadio();
 }
 
 async function addFiles() {
@@ -1596,14 +1340,15 @@ async function applyLibraryScanResult(result, notify=true){
   const scanPaths = hasExplicitPathList ? result.foundPaths : scanTracks.map(track => track?.sourcePath || track?.path || '').filter(Boolean);
   const currentPaths = new Set(scanPaths.filter(Boolean).map(normalizeFsPath));
   const hasScanEvidence = currentPaths.size > 0;
+  const canPruneMissing = hasExplicitPathList && hasScanEvidence;
   const configuredRoot = normalizeFsPath(state.settings.musicFolder || '');
   const playlistRoot = normalizeFsPath((state.settings.musicFolder ? `${state.settings.musicFolder}/Localify Playlists` : ''));
   const removedIds = new Set();
-  // Don't prune a music library based on an empty scan result. Android SAF scans
-  // return tracks but may omit foundPaths; derive them from the scanned tracks instead.
+  // Android SAF does not provide an authoritative foundPaths list. In that case
+  // synchronization only adds/updates discovered tracks and never deletes saved entries.
   state.library = state.library.filter(t => {
     const path = normalizeFsPath(t.sourcePath || t.path || '');
-    if(!path || !configuredRoot || !hasScanEvidence) return true;
+    if(!path || !configuredRoot || !canPruneMissing) return true;
     const underConfigured = path === configuredRoot || path.startsWith(configuredRoot + '/');
     const underPlaylist = playlistRoot && (path === playlistRoot || path.startsWith(playlistRoot + '/'));
     if((underConfigured || underPlaylist) && !currentPaths.has(path)){ removedIds.add(t.id); return false; }
@@ -2439,7 +2184,6 @@ function renderCurrentView() {
     case 'home': window.renderHome?.(); break;
     case 'library': renderLibrary(); break;
     case 'onlineSearch': renderOnlineSearch(); break;
-    case 'radio': renderRadio(); break;
     case 'playlists':
       if (state.currentPlaylist) renderPlaylistDetail(); else renderPlaylists();
       break;
@@ -2582,7 +2326,7 @@ async function playCurrentPlayback() {
   state.userVolume=Number.isFinite(state.userVolume)?state.userVolume:audio.volume;
   audio.volume=state.userVolume;
   updateNowPlaying(track);
-  window.localify.playback.nowPlaying({title:track.title||'Без названия',artist:track.artist||'',album:track.album||''});
+  window.localify.playback.nowPlaying(nativePlaybackPayload(false));
   const p=audio.play();
   if(p?.then) p.then(()=>syncPlayButton(true)).catch(()=>syncPlayButton(false));
   markTrackPlayed(track);
@@ -2753,6 +2497,19 @@ function bindMobileTrackSwipe(element) {
     event.stopPropagation();
     if (dx < 0) void next(); else previous();
   }, {passive:false});
+}
+function nativePlaybackPayload(playing) {
+  const track = currentTrack() || {};
+  return {
+    title: track.title || 'Localify Crimson',
+    artist: track.artist || '',
+    album: track.album || '',
+    sourcePath: track.sourcePath || track.path || '',
+    cover: track.remoteCover || track.cover || '',
+    duration: Number(track.duration) || 0,
+    position: Number(audio.currentTime) || 0,
+    playing: !!playing
+  };
 }
 function updateNowPlaying(t){
   const title = t?.title || 'Ничего не играет';

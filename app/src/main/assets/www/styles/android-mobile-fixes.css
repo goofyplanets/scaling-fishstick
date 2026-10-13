@@ -261,3 +261,62 @@ html .mobile-full-player { display:none !important; }
   html.android-app .player { padding-top:5px !important; padding-bottom:13px !important; }
   html.android-app .app-shell { height:calc(100dvh - var(--player-h) - var(--player-lift)) !important; }
 }
+
+/* Settings stay a single column on Android, and long Storage Access Framework URIs wrap. */
+@media (max-width:1000px) {
+  html.android-app #settingsView.active-view {
+    overflow-x:hidden !important; overflow-y:auto !important;
+    height:calc(100% - 58px) !important; max-width:100% !important;
+    box-sizing:border-box !important; padding:16px 12px calc(34px + var(--player-lift, 28px)) !important;
+    overscroll-behavior:contain;
+  }
+  html.android-app #settingsView .settings-grid {
+    display:grid !important; grid-template-columns:minmax(0,1fr) !important;
+    gap:12px !important; width:100% !important; min-width:0 !important; margin:0 !important;
+  }
+  html.android-app #settingsView .settings-card,
+  html.android-app #settingsView .folder-settings-card {
+    width:100% !important; min-width:0 !important; max-width:100% !important;
+    box-sizing:border-box !important; margin:0 !important;
+  }
+  html.android-app #settingsView .music-folder-box {
+    display:flex !important; align-items:flex-start !important; gap:10px !important;
+    width:100% !important; min-width:0 !important; box-sizing:border-box !important;
+  }
+  html.android-app #settingsView .music-folder-copy {
+    display:flex !important; flex:1 1 auto !important; flex-direction:column !important;
+    min-width:0 !important; max-width:100% !important;
+  }
+  html.android-app #settingsView #musicFolderPath {
+    display:block !important; max-width:100% !important; min-width:0 !important;
+    white-space:normal !important; overflow-wrap:anywhere !important; word-break:break-word !important;
+    line-height:1.4 !important;
+  }
+  html.android-app #settingsView .folder-actions { display:flex !important; flex-wrap:wrap !important; gap:8px !important; min-width:0 !important; }
+  html.android-app #settingsView .folder-actions button { max-width:100%; white-space:normal; }
+}
+@media (max-width:1000px) {
+  html.android-app { --player-h:94px; --player-lift:28px; }
+  html.android-app .app-shell { height:calc(100dvh - var(--player-h) - var(--player-lift)) !important; }
+  html.android-app .player { bottom:var(--player-lift) !important; }
+  html.android-app .player .seek {
+    left:10px !important; right:10px !important; bottom:3px !important;
+    display:flex !important; align-items:center !important; gap:7px !important;
+    height:13px !important; min-height:13px !important; overflow:visible !important;
+    font-size:9px !important; line-height:13px !important;
+  }
+  html.android-app .player .seek span {
+    display:block !important; flex:0 0 auto !important; min-width:29px !important;
+    font-size:9px !important; line-height:13px !important; color:rgba(244,223,226,.68) !important;
+    white-space:nowrap !important;
+  }
+  html.android-app .player .seek input {
+    display:block !important; flex:1 1 auto !important; min-width:0 !important;
+    height:3px !important; min-height:3px !important; margin:0 !important;
+  }
+}
+@media (max-width:380px) {
+  html.android-app .player { padding-left:9px !important; padding-right:9px !important; }
+  html.android-app .player .seek { left:9px !important; right:9px !important; }
+  html.android-app .player .seek span { min-width:26px !important; font-size:8px !important; }
+}

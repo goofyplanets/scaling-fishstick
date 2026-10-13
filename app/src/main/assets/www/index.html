@@ -26,7 +26,6 @@
       <nav class="nav">
         <button class="nav-item active" data-view="home"><img class="nav-icon" src="./../assets/nav/home.svg" alt="">Главная</button>
         <button class="nav-item" data-view="library"><img class="nav-icon" src="./../assets/nav/library.svg" alt="">Моя музыка</button>
-                <button class="nav-item" data-view="radio"><span class="nav-icon radio-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m7 5 3-3"/><circle cx="8" cy="12" r="2.1"/><path d="M12.5 10h5M12.5 13h5M12.5 16h3"/></svg></span>Радио</button>
         <button class="nav-item" data-view="settings"><span class="nav-icon gear-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z"/><path d="M19.4 13.35c.04-.45.04-.9 0-1.35l1.52-1.19-1.65-2.86-1.83.74a7.4 7.4 0 0 0-2.34-1.35L14.85 5h-3.3l-.25 2.34a7.4 7.4 0 0 0-2.34 1.35l-1.83-.74-1.65 2.86L7 12a7.8 7.8 0 0 0 0 2l-1.52 1.19 1.65 2.86 1.83-.74a7.4 7.4 0 0 0 2.34 1.35L11.55 21h3.3l.25-2.34a7.4 7.4 0 0 0 2.34-1.35l1.83.74 1.65-2.86-1.52-1.19Z"/></svg></span>Настройки</button>
       </nav>
       <div class="side-section genre-section">
@@ -73,15 +72,6 @@
       <section id="playlistsView" class="view">
         <div class="playlist-page-title"><h1>Плейлисты</h1></div>
         <div id="playlistGrid" class="card-grid"></div>
-      </section>
-
-      <section id="radioView" class="view">
-        <div class="radio-head">
-          <div><div class="eyebrow">АВТОМАТИЧЕСКОЕ РАДИО</div><h1>Радио</h1><p>Crimson автоматически берёт небольшую выборку вашей библиотеки, определяет музыкальный профиль и подбирает похожую музыку онлайн. Затем смешивает её с локальными треками.</p></div>
-          <div class="radio-search"><input id="radioSearch" autocomplete="off" placeholder="Найти трек, исполнителя или альбом онлайн…"><button id="radioSearchBtn" class="primary" type="button">Найти</button></div>
-        </div>
-        <div class="radio-toolbar"><div class="radio-scope"><label for="radioScope">Основа</label><select id="radioScope" aria-label="Источник локальной библиотеки для радио"><option value="all">Вся моя музыка</option></select></div><div id="radioSourceTabs" class="radio-source-tabs" role="tablist" aria-label="Источник воспроизведения"><button type="button" class="radio-source-tab active" data-radio-mode="all">Всё</button><button type="button" class="radio-source-tab" data-radio-mode="local">Моя музыка</button><button type="button" class="radio-source-tab" data-radio-mode="online">Онлайн</button></div><span id="radioStatus">Выберите основу радио и нажмите «Запустить радио».</span><div class="radio-toolbar-actions"><button id="radioPlayBtn" class="primary" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6V6Z"/></svg> Запустить радио</button><button id="radioRefreshBtn" class="secondary" type="button" title="Заново подобрать онлайн-треки по текущей основе"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8a7 7 0 1 0 1 5"/><path d="M19 4v4h-4"/></svg> Обновить подборку</button></div></div>
-        <div id="radioGrid" class="radio-grid"></div>
       </section>
 
       <section id="onlineSearchView" class="view">
