@@ -168,7 +168,7 @@ const DEFAULT_SETTINGS = {
   ytDlpPath: 'yt-dlp',
   cookiesFile: '',
   proxy: '',
-  downloadMode: 'mp3',
+  downloadMode: 'original',
   gapless: true,
   uiDensity: 'normal',
   coverSize: 'medium',
