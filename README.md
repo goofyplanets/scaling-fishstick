@@ -1,0 +1,2 @@
+# scaling-fishstick
+local player
