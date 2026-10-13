@@ -155,7 +155,7 @@
       },
       downloadYtDlp: payload => nativePayloadRequest('downloadYtDlp', payload || {}),
       resolveYtDlp: payload => nativePayloadRequest('resolveYtDlp', payload || {}),
-      updateYtDlp: () => Promise.reject(new Error('Автообновление встроенного yt-dlp пока не поддерживается; используется версия в APK.')),
+      updateYtDlp: () => nativePayloadRequest('updateYtDlp', {}),
       chooseYtDlp: () => Promise.resolve(''), chooseCookiesFile: () => Promise.resolve('')
     },
     playlists: {
