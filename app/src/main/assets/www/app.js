@@ -1771,18 +1771,13 @@ async function runOnlineSearch(query=state.search, openView=true){
   if(openView && state.currentView!=='onlineSearch') setView('onlineSearch'); else renderOnlineSearch();
   try{
     const cacheKey=`${q.toLocaleLowerCase()}::12`;
-    const cached=getOnlineCache(cacheKey);
-    if(cached && Date.now()-cached.at<5*60*1000){
-      if(token===state.onlineSearchToken) state.onlineSearchResults=filterOnlineResults(cached.results);
-      return state.onlineSearchResults;
-    }
     if (window.__LOCALIFY_ANDROID__) {
       window.__localifyAndroidSearchUpdate = payload => {
         const returnedQuery = String(payload?.query || '').trim().toLocaleLowerCase();
-        if (token !== state.onlineSearchToken || returnedQuery !== q.toLocaleLowerCase()) return;
+        if (token !== state.onlineSearchToken || returnedQuery !== q.toLocaleLowerCase() || String(state.search || '').trim().toLocaleLowerCase() !== q.toLocaleLowerCase()) return;
         if (payload?.error) {
           console.warn('YouTube search failed:', payload.error);
-          if (!state.onlineSearchResults.length) toast('Поиск YouTube не удался: ' + String(payload.error));
+          toast('Поиск YouTube не удался: ' + String(payload.error));
           return;
         }
         const remote = filterOnlineResults(Array.isArray(payload?.results) ? payload.results : []);
@@ -1792,6 +1787,11 @@ async function runOnlineSearch(query=state.search, openView=true){
         setOnlineCache(cacheKey, {at: Date.now(), results: merged});
         renderOnlineSearch();
       };
+    }
+    const cached=getOnlineCache(cacheKey);
+    if(cached && Date.now()-cached.at<5*60*1000){
+      if(token===state.onlineSearchToken) state.onlineSearchResults=filterOnlineResults(cached.results);
+      return state.onlineSearchResults;
     }
     const results=await window.localify.providers.onlineSearch({query:q,limit:12,localLibrary:state.library.map(t=>({title:t.title,artist:t.artist,provider:t.provider,providerId:t.providerId}))});
     if(token!==state.onlineSearchToken) return state.onlineSearchResults;
