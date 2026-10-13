@@ -576,6 +576,20 @@ public class LocalifyAndroidBridge {
         } catch (Exception ignored) { return false; }
     }
 
+    private boolean isDirectMediaUrl(String rawUrl) {
+        if (!isHttpUrl(rawUrl)) return false;
+        String host = Uri.parse(rawUrl).getHost();
+        if (host == null) return false;
+        host = host.toLowerCase(Locale.ROOT);
+        // A YouTube watch-page URL is HTTP, but it is not an audio stream. Do not
+        // hand HTML pages to WebView's <audio> element as if they were media files.
+        return !(host.equals("youtube.com") || host.endsWith(".youtube.com")
+            || host.equals("youtu.be") || host.endsWith(".youtu.be")
+            || host.equals("youtube-nocookie.com") || host.endsWith(".youtube-nocookie.com")
+            || host.equals("youtube.googleapis.com") || host.endsWith(".youtube.googleapis.com")
+            || host.equals("ytimg.com") || host.endsWith(".ytimg.com"));
+    }
+
     @JavascriptInterface public void updateYtDlp(String raw, int callbackId) {
         ytDlpExecutor.execute(() -> {
             try {
@@ -697,17 +711,17 @@ public class LocalifyAndroidBridge {
                 request.addOption("--extractor-retries", "1");
                 VideoInfo info = YoutubeDL.getInstance().getInfo(request);
                 String stream = info == null || info.getUrl() == null ? "" : info.getUrl();
-                if (!isHttpUrl(stream) && info != null && info.getFormats() != null) {
+                if (!isDirectMediaUrl(stream) && info != null && info.getFormats() != null) {
                     for (com.yausername.youtubedl_android.mapper.VideoFormat format : info.getFormats()) {
                         String audioCodec = format.getAcodec() == null ? "" : format.getAcodec();
                         String candidate = format.getUrl() == null ? "" : format.getUrl();
-                        if (isHttpUrl(candidate) && !audioCodec.isEmpty() && !"none".equalsIgnoreCase(audioCodec)) {
+                        if (isDirectMediaUrl(candidate) && !audioCodec.isEmpty() && !"none".equalsIgnoreCase(audioCodec)) {
                             stream = candidate;
                             break;
                         }
                     }
                 }
-                if (!isHttpUrl(stream)) throw new IOException("Не удалось получить прямой аудиопоток");
+                if (!isDirectMediaUrl(stream)) throw new IOException("yt-dlp не вернул прямую ссылку на аудио. Проверьте обновление yt-dlp и повторите попытку.");
                 JSONObject resolved = new JSONObject();
                 put(resolved, "url", stream);
                 put(resolved, "title", info == null ? payload.optString("title", "") : info.getTitle());
@@ -792,6 +806,11 @@ public class LocalifyAndroidBridge {
         }
         JSONObject localTrack = makeTrack(resultUri, name, System.currentTimeMillis());
         if (localTrack == null) throw new IOException("Файл скачан, но не удалось прочитать его метаданные");
+        String onlineCover = source.optString("cover", source.optString("remoteCover", "")).trim();
+        if (isHttpUrl(onlineCover)) {
+            if (localTrack.optString("cover", "").trim().isEmpty()) put(localTrack, "cover", onlineCover);
+            if (localTrack.optString("remoteCover", "").trim().isEmpty()) put(localTrack, "remoteCover", onlineCover);
+        }
         put(localTrack, "provider", "local");
         put(localTrack, "downloadedPath", resultUri.toString());
         put(localTrack, "downloadSourceUrl", source.optString("sourceUrl", ""));
