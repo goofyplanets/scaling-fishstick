@@ -951,7 +951,7 @@ function setupDialogAccessibility() {
 function renderSettings() {
   window.LocalifySettingsUI?.render(state.settings, state.providerConfig);
   const mode = $('#settingAndroidDownloadMode');
-  if (mode) mode.value = state.settings.downloadMode === 'original' ? 'original' : 'mp3';
+  if (mode) mode.value = state.settings.downloadMode === 'mp3' ? 'mp3' : 'original';
   const folder = $('#downloadFolderPath');
   if (folder) folder.textContent = state.settings.downloadFolder ? (state.settings.downloadFolderLabel || 'Выбрана папка Android') : 'По умолчанию: Music/Localify Downloads';
   updateMetadataQueueStatus();
