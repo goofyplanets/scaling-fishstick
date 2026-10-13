@@ -299,13 +299,61 @@ public class LocalifyAndroidBridge {
         return tracks;
     }
 
+    /**
+     * Different Android DocumentsProviders expose different document columns.
+     * Ask for last-modified first (it lets us reuse cached metadata), then retry
+     * with only the SAF-required columns if that extended projection is rejected.
+     * Previously a provider rejecting COLUMN_LAST_MODIFIED made the whole scan
+     * silently return an empty library.
+     */
+    private Cursor queryDocumentColumns(Uri uri) {
+        ContentResolver resolver = activity.getContentResolver();
+        String[] detailed = {
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED
+        };
+        try {
+            Cursor cursor = resolver.query(uri, detailed, null, null, null);
+            if (cursor != null
+                    && cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID) >= 0
+                    && cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME) >= 0
+                    && cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE) >= 0) {
+                return cursor;
+            }
+            if (cursor != null) cursor.close();
+        } catch (Exception e) {
+            Log.w(TAG, "DocumentsProvider rejected the extended library-scan query; retrying with basic columns: " + uri, e);
+        }
+        String[] basic = {
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE
+        };
+        try {
+            Cursor cursor = resolver.query(uri, basic, null, null, null);
+            if (cursor != null
+                    && cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID) >= 0
+                    && cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME) >= 0
+                    && cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE) >= 0) {
+                return cursor;
+            }
+            if (cursor != null) cursor.close();
+            Log.w(TAG, "DocumentsProvider returned no usable cursor for library scan: " + uri);
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to query library folder: " + uri, e);
+        }
+        return null;
+    }
+
     private void scanDocument(Uri treeUri, Uri docUri, int depth, JSONArray out, Set<String> visited, Map<String, JSONObject> cachedTracks) {
         if (depth > 10 || out.length() >= 15000) return;
         String docId;
         try { docId = DocumentsContract.getDocumentId(docUri); } catch (Exception e) { return; }
         if (!visited.add(docId)) return;
         ContentResolver resolver = activity.getContentResolver();
-        try (Cursor cursor = resolver.query(docUri, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_LAST_MODIFIED}, null, null, null)) {
+        try (Cursor cursor = queryDocumentColumns(docUri)) {
             if (cursor != null && cursor.moveToFirst()) {
                 String display = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
                 String mime = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
@@ -319,7 +367,7 @@ public class LocalifyAndroidBridge {
         } catch (Exception ignored) {}
         try {
             Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId);
-            try (Cursor cursor = resolver.query(children, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_LAST_MODIFIED}, null, null, null)) {
+            try (Cursor cursor = queryDocumentColumns(children)) {
                 if (cursor == null) return;
                 while (cursor.moveToNext() && out.length() < 15000) {
                     String childId = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID));
