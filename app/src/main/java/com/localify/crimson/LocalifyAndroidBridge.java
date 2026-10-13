@@ -769,7 +769,7 @@ public class LocalifyAndroidBridge {
         String selectedDownloadFolder = readJsonFile("settings.json", defaultSettings()).optString("downloadFolder", "").trim();
         if (!selectedDownloadFolder.isEmpty()) {
             Uri treeUri = Uri.parse(selectedDownloadFolder);
-            String mime = extension.equals("mp3") ? "audio/mpeg" : extension.equals("m4a") ? "audio/mp4" : extension.equals("aac") ? "audio/aac" : "audio/*";
+            String mime = extension.equals("mp3") ? "audio/mpeg" : extension.equals("m4a") ? "audio/mp4" : extension.equals("aac") ? "audio/aac" : extension.equals("opus") || extension.equals("ogg") ? "audio/ogg" : extension.equals("webm") ? "audio/webm" : "audio/*";
             resultUri = DocumentsContract.createDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri)), mime, name);
             if (resultUri == null) throw new IOException("Не удалось создать файл в выбранной папке загрузок");
             try (InputStream input = new FileInputStream(downloaded); java.io.OutputStream output = resolver.openOutputStream(resultUri, "w")) {
@@ -936,7 +936,7 @@ public class LocalifyAndroidBridge {
         try {
             x.put("closeToTray", false); x.put("startMinimized", false); x.put("trayEnabled", false); x.put("minimizeToTray", false);
             x.put("mediaKeys", true); x.put("notifications", true); x.put("onlineMetadata", true); x.put("renameFiles", false); x.put("moveFilesIntoPlaylists", false);
-            x.put("musicFolder", ""); x.put("downloadFolder", ""); x.put("ytDlpPath", "Not available in Android build"); x.put("cookiesFile", ""); x.put("proxy", ""); x.put("downloadMode", "m4a");
+            x.put("musicFolder", ""); x.put("downloadFolder", ""); x.put("ytDlpPath", "Not available in Android build"); x.put("cookiesFile", ""); x.put("proxy", ""); x.put("downloadMode", "original");
             x.put("gapless", true); x.put("uiDensity", "normal"); x.put("coverSize", "medium"); x.put("reduceMotion", false); x.put("compactPlayer", false); x.put("autoWatch", false);
         } catch (Exception ignored) {}
         return x;
