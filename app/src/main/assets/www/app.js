@@ -46,6 +46,7 @@ const state = {
   genreCollapsed: localStorage.getItem('localify.genreCollapsed') === '1',
   onlineSearchResults: [],
   onlineSearchLoading: false,
+  onlineSearchYoutubePending: false,
   currentView: 'home',
   currentPlaylist: null,
   coverDraft: '',
@@ -1767,21 +1768,28 @@ async function runOnlineSearch(query=state.search, openView=true){
   // Токен запроса: медленный старый ответ не должен перезаписывать результаты
   // более нового поиска (status-строка уже показывает новый запрос).
   const token=(state.onlineSearchToken=(state.onlineSearchToken||0)+1);
-  state.search=q; state.onlineSearchLoading=true; state.onlineSearchResults=[];
+  state.search=q; state.onlineSearchLoading=true; state.onlineSearchYoutubePending=false; state.onlineSearchResults=[];
   if(openView && state.currentView!=='onlineSearch') setView('onlineSearch'); else renderOnlineSearch();
   try{
     const cacheKey=`${q.toLocaleLowerCase()}::12`;
     if (window.__LOCALIFY_ANDROID__) {
       window.__localifyAndroidSearchUpdate = payload => {
         const returnedQuery = String(payload?.query || '').trim().toLocaleLowerCase();
-        if (token !== state.onlineSearchToken || returnedQuery !== q.toLocaleLowerCase() || String(state.search || '').trim().toLocaleLowerCase() !== q.toLocaleLowerCase()) return;
+        if (token !== state.onlineSearchToken || returnedQuery !== q.toLocaleLowerCase()) return;
+        if (String(state.search || '').trim().toLocaleLowerCase() !== q.toLocaleLowerCase()) {
+          state.onlineSearchYoutubePending = false;
+          renderOnlineSearch();
+          return;
+        }
+        state.onlineSearchYoutubePending = false;
         if (payload?.error) {
           console.warn('YouTube search failed:', payload.error);
           toast('Поиск YouTube не удался: ' + String(payload.error));
+          renderOnlineSearch();
           return;
         }
         const remote = filterOnlineResults(Array.isArray(payload?.results) ? payload.results : []);
-        if (!remote.length) return;
+        if (!remote.length) { renderOnlineSearch(); return; }
         const merged = filterOnlineResults([...(state.onlineSearchResults || []), ...remote]);
         state.onlineSearchResults = merged;
         setOnlineCache(cacheKey, {at: Date.now(), results: merged});
@@ -1793,6 +1801,7 @@ async function runOnlineSearch(query=state.search, openView=true){
       if(token===state.onlineSearchToken) state.onlineSearchResults=filterOnlineResults(cached.results);
       return state.onlineSearchResults;
     }
+    if (window.__LOCALIFY_ANDROID__) state.onlineSearchYoutubePending = true;
     const results=await window.localify.providers.onlineSearch({query:q,limit:12,localLibrary:state.library.map(t=>({title:t.title,artist:t.artist,provider:t.provider,providerId:t.providerId}))});
     if(token!==state.onlineSearchToken) return state.onlineSearchResults;
     const filtered=filterOnlineResults(results||[]);
@@ -1809,13 +1818,17 @@ function renderOnlineSearch(){
   const box=$('#onlineSearchResults'); if(!box) return;
   const q=state.search.trim();
   const status=$('#onlineSearchStatus');
-  if(status) status.textContent=state.onlineSearchLoading ? (window.__LOCALIFY_ANDROID__ ? `Ищу на YouTube и в музыкальных превью для «${q}»…` : `Ищу «${q}» на YouTube…`) : (q ? `Результаты для «${q}»` : 'Введите запрос в поиске выше');
+  if(status) status.textContent=state.onlineSearchLoading
+    ? (window.__LOCALIFY_ANDROID__ ? `Ищу на YouTube и в музыкальных превью для «${q}»…` : `Ищу «${q}» на YouTube…`)
+    : (window.__LOCALIFY_ANDROID__ && state.onlineSearchYoutubePending
+      ? `Превью iTunes показаны; продолжаю поиск YouTube для «${q}»…`
+      : (q ? `Результаты для «${q}»` : 'Введите запрос в поиске выше'));
   if(state.onlineSearchLoading){ box.innerHTML=`<div class="empty online-loading">${window.__LOCALIFY_ANDROID__?'Поиск музыкальных превью…':'Поиск через yt-dlp…'}</div>`; return; }
   const list=state.onlineSearchResults||[];
   box.innerHTML=list.length ? list.map((c,i)=>{
     const canUseYtdlnis=false;
     return `<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='itunes'?'iTunes Preview':'YouTube'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button>${canUseYtdlnis?`<button type="button" class="secondary small-btn" data-online-ytdlnis="${i}">${uiIcon('download')} Скачать через YTDLnis</button>`:''}<button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='itunes'?'Открыть страницу':'Открыть YouTube'}</button></div></div></article>`;
-  }).join('') : `<div class="empty">${q?'Ничего не найдено. Проверьте yt-dlp и интернет-соединение.':'Введите запрос для онлайн-поиска.'}</div>`;
+  }).join('') : `<div class="empty">${q ? (window.__LOCALIFY_ANDROID__ && state.onlineSearchYoutubePending ? 'Проверяю YouTube, пока быстрых превью нет…' : 'Ничего не найдено. Проверьте интернет-соединение и повторите поиск.') : 'Введите запрос для онлайн-поиска.'}</div>`;
   if(window.__LOCALIFY_ANDROID__) {
     box.querySelectorAll('.online-card').forEach((card, index) => {
       if(state.onlineSearchResults[index]?.provider === 'itunes') card.querySelector('[data-online-download]')?.remove();
