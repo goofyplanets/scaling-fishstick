@@ -45,3 +45,10 @@ html.android-app label:has(#settingAutoWatch),
 html.android-app label:has(#settingMoveFilesIntoPlaylists),
 html.android-app label:has(#settingRenameFiles) { display:none !important; }
 
+
+
+/* Music-first navigation: playlists are retired from the visible interface. */
+#sidebarPlaylists, #addPlaylistSide, .side-section:has(#sidebarPlaylists), #newPlaylistBtn, #homePlaylistGrid, #homePlaylistsBtn, .home-section-head:has(+ #homePlaylistGrid), #playlistsView, #playlistDialog, #editPlaylistDialog, .playlist-page-title, .playlist-list, [data-view="playlists"] { display:none !important; }
+.download-folder-settings { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.download-folder-box { margin-bottom:12px; }
+.download-folder-box .music-folder-copy span { overflow-wrap:anywhere; }
