@@ -1793,21 +1793,14 @@ function renderOnlineSearch(){
   const q=state.search.trim();
   const status=$('#onlineSearchStatus');
   if(status) status.textContent=state.onlineSearchLoading
-    ? (window.__LOCALIFY_ANDROID__ ? `Ищу на YouTube и в музыкальных превью для «${q}»…` : `Ищу «${q}» на YouTube…`)
-    : (window.__LOCALIFY_ANDROID__ && state.onlineSearchYoutubePending
-      ? `Превью iTunes показаны; продолжаю поиск YouTube для «${q}»…`
-      : (q ? `Результаты для «${q}»` : 'Введите запрос в поиске выше'));
+    ? `Ищу «${q}» на YouTube…`
+    : (q ? `Результаты YouTube для «${q}»` : 'Введите запрос для онлайн-поиска');
   if(state.onlineSearchLoading){ box.innerHTML=`<div class="empty online-loading">Поиск на YouTube через yt-dlp…</div>`; return; }
   const list=state.onlineSearchResults||[];
   box.innerHTML=list.length ? list.map((c,i)=>{
     const canUseYtdlnis=false;
-    return `<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='itunes'?'iTunes Preview':'YouTube'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button>${canUseYtdlnis?`<button type="button" class="secondary small-btn" data-online-ytdlnis="${i}">${uiIcon('download')} Скачать через YTDLnis</button>`:''}<button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='itunes'?'Открыть страницу':'Открыть YouTube'}</button></div></div></article>`;
-  }).join('') : `<div class="empty">${q ? (window.__LOCALIFY_ANDROID__ && state.onlineSearchYoutubePending ? 'Проверяю YouTube, пока быстрых превью нет…' : 'Ничего не найдено. Проверьте интернет-соединение и повторите поиск.') : 'Введите запрос для онлайн-поиска.'}</div>`;
-  if(window.__LOCALIFY_ANDROID__) {
-    box.querySelectorAll('.online-card').forEach((card, index) => {
-      if(state.onlineSearchResults[index]?.provider === 'itunes') card.querySelector('[data-online-download]')?.remove();
-    });
-  }
+    return `<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='youtube'?'YouTube':'Источник'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button>${canUseYtdlnis?`<button type="button" class="secondary small-btn" data-online-ytdlnis="${i}">${uiIcon('download')} Скачать через YTDLnis</button>`:''}<button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='youtube'?'Открыть YouTube':'Открыть источник'}</button></div></div></article>`;
+  }).join('') : `<div class="empty">${q ? 'Ничего не найдено на YouTube. Проверьте интернет-соединение и повторите поиск.' : 'Введите запрос для онлайн-поиска.'}</div>`;
   box.onclick=async e=>{
     const btn=e.target.closest('[data-online-play],[data-online-download],[data-online-source]'); if(!btn)return;
     const i=Number(btn.dataset.onlinePlay??btn.dataset.onlineDownload??btn.dataset.onlineSource); const track=state.onlineSearchResults[i]; if(!track)return;
@@ -2353,7 +2346,7 @@ async function playCurrentPlayback() {
   if(p?.then) p.then(()=>syncPlayButton(true)).catch(err=>{
     syncPlayButton(false);
     console.warn('Audio playback failed', err);
-    if(track.provider==='youtube' || track.provider==='itunes') toast('Не удалось воспроизвести онлайн-аудио. Попробуй другой результат или повтори поиск.');
+    if(track.provider==='youtube') toast('Не удалось воспроизвести онлайн-аудио. Попробуй повторить поиск.');
   });
   markTrackPlayed(track);
   addHistory(track);
