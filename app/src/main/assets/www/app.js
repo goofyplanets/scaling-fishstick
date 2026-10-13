@@ -953,7 +953,7 @@ function renderSettings() {
   const mode = $('#settingAndroidDownloadMode');
   if (mode) mode.value = state.settings.downloadMode === 'mp3' ? 'mp3' : 'original';
   const folder = $('#downloadFolderPath');
-  if (folder) folder.textContent = state.settings.downloadFolder ? (state.settings.downloadFolderLabel || 'Выбрана папка Android') : 'По умолчанию: Music/Localify Downloads';
+  if (folder) folder.textContent = state.settings.downloadFolder ? (state.settings.downloadFolderLabel || state.settings.downloadFolder) : (document.documentElement.classList.contains('android-app') ? 'По умолчанию: Music/Localify Downloads' : 'По умолчанию: папка Localify Downloads в музыкальной папке');
   updateMetadataQueueStatus();
 }
 
@@ -1273,7 +1273,7 @@ async function chooseAndSetDownloadFolder(){
     const result = await window.localify.chooseDownloadFolder();
     if (!result?.folder) return;
     state.settings.downloadFolder = result.folder;
-    state.settings.downloadFolderLabel = result.displayName || 'Выбрана папка Android';
+    state.settings.downloadFolderLabel = result.displayName || result.folder;
     await window.localify.settings.save(state.settings);
     renderSettings();
     toast('Папка загрузок сохранена');
