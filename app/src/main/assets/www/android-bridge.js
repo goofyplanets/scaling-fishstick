@@ -100,46 +100,15 @@
       saveConfig: data => Promise.resolve(native.saveProviderConfig(JSON.stringify(data || {}))),
       onlineSearch: async payload => {
         const request = payload || {};
-        const query = String(request.query || '');
-        const youtubeRequest = { ...request, limit: Math.min(6, Number(request.limit) || 6) };
-        const itunesRequest = { ...request, limit: Math.min(8, Number(request.limit) || 8) };
-
-        // Start YouTube immediately, but do not make the faster Apple previews wait
-        // for Python/yt-dlp startup. The app merges YouTube results when they arrive.
-        const youtubePromise = nativePayloadRequest('searchYtDlp', youtubeRequest)
-          .then(value => Array.isArray(value) ? value : parse(value, []))
-          .catch(error => {
-            console.warn('YouTube search failed', error);
-            return { __searchError: error?.message || String(error) };
-          });
-
-        const appleValue = await nativePayloadRequest('searchItunes', itunesRequest)
-          .catch(error => {
-            console.warn('iTunes preview search failed', error);
-            return [];
-          });
-        const apple = Array.isArray(appleValue) ? appleValue : parse(appleValue, []);
-
-        // Deliver the slower provider as a second batch. setTimeout lets the initial
-        // iTunes-only result render first even when yt-dlp finishes at nearly the same time.
-        youtubePromise.then(result => {
-          setTimeout(() => {
-            try {
-              const callback = window.__localifyAndroidSearchUpdate;
-              if (typeof callback === 'function') {
-                if (result && !Array.isArray(result) && result.__searchError) {
-                  callback({ query, results: [], error: result.__searchError });
-                } else {
-                  callback({ query, results: Array.isArray(result) ? result : [] });
-                }
-              }
-            } catch (error) { console.warn('Could not merge YouTube search results', error); }
-          }, 0);
-        });
-
+        const limit = Math.min(6, Number(request.limit) || 6);
+        const value = await nativePayloadRequest('searchYtDlp', { ...request, limit });
+        const results = Array.isArray(value) ? value : parse(value, []);
         const seen = new Set();
-        return apple.filter(item => {
-          const key = String(item?.provider + ':' + (item?.providerId || item?.sourceUrl || item?.title || '')).toLowerCase();
+        return results.filter(item => {
+          // Android online search is intentionally YouTube-only: no short Apple
+          // Music/iTunes preview results mixed into this list.
+          if (item?.provider !== 'youtube') return false;
+          const key = String(item.providerId || item.sourceUrl || item.title || '').toLowerCase();
           if (!key || seen.has(key)) return false;
           seen.add(key);
           return true;
