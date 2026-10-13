@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
+import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
@@ -43,6 +44,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import com.yausername.youtubedl_android.YoutubeDL;
+import com.yausername.youtubedl_android.YoutubeDLRequest;
+import com.yausername.youtubedl_android.YoutubeDLResponse;
+import com.yausername.youtubedl_android.mapper.VideoInfo;
+import com.yausername.ffmpeg.FFmpeg;
 
 public class LocalifyAndroidBridge {
     private static final String TAG = "LocalifyAndroidBridge";
@@ -54,6 +63,9 @@ public class LocalifyAndroidBridge {
     private int pendingCallbackId = -1;
     private String pendingAction = "";
     private volatile boolean scanCancelled = false;
+    private final ExecutorService ytDlpExecutor = Executors.newFixedThreadPool(2);
+    private static volatile boolean ytDlpInitialized = false;
+    private static final Object YT_DLP_INIT_LOCK = new Object();
 
     LocalifyAndroidBridge(MainActivity activity) {
         this.activity = activity;
@@ -516,31 +528,268 @@ public class LocalifyAndroidBridge {
     @JavascriptInterface public String getLibraryWatchStatus() { return "{\"enabled\":false,\"active\":false,\"folder\":\"\"}"; }
     @JavascriptInterface public void ignoreEvent(String ignored) {}
 
-    @JavascriptInterface public void downloadWithYtdlnis(String raw, int callbackId) {
+    private void ensureYtDlpInitialized() throws Exception {
+        if (ytDlpInitialized) return;
+        synchronized (YT_DLP_INIT_LOCK) {
+            if (ytDlpInitialized) return;
+            android.content.Context appContext = activity.getApplicationContext();
+            YoutubeDL.getInstance().init(appContext);
+            FFmpeg.getInstance().init(appContext);
+            ytDlpInitialized = true;
+        }
+    }
+
+    private boolean isHttpUrl(String rawUrl) {
+        try {
+            Uri uri = Uri.parse(rawUrl);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            return (scheme.equals("https") || scheme.equals("http"))
+                && uri.getHost() != null && rawUrl.length() <= 4096;
+        } catch (Exception ignored) { return false; }
+    }
+
+    @JavascriptInterface public void searchYtDlp(String raw, int callbackId) {
         JSONObject payload = parseObject(raw);
-        String url = payload.optString("url", payload.optString("sourceUrl", "")).trim();
-        Uri parsed = Uri.parse(url);
-        String scheme = parsed.getScheme() == null ? "" : parsed.getScheme().toLowerCase(Locale.ROOT);
-        if (!(scheme.equals("https") || scheme.equals("http")) || url.length() > 4096) {
-            finishCallback(callbackId, JSONObject.NULL, "У результата нет поддерживаемой веб-ссылки для YTDLnis");
+        String query = payload.optString("query", "").trim();
+        final int limit = Math.max(1, Math.min(12, payload.optInt("limit", 10)));
+        if (query.isEmpty() || query.length() > 180) {
+            finishCallback(callbackId, new JSONArray(), null);
             return;
         }
-        activity.runOnUi(() -> {
+        ytDlpExecutor.execute(() -> {
+            JSONArray results = new JSONArray();
             try {
-                Intent intent = new Intent(Intent.ACTION_SEND);
-                intent.setType("text/plain");
-                intent.putExtra(Intent.EXTRA_TEXT, url);
-                intent.putExtra("TYPE", "audio");
-                intent.putExtra("BACKGROUND", false);
-                intent.setPackage("com.deniscerri.ytdl");
-                activity.startActivity(intent);
-                finishCallback(callbackId, new JSONObject(), null);
-            } catch (android.content.ActivityNotFoundException ex) {
-                finishCallback(callbackId, JSONObject.NULL, "YTDLnis не установлен. Установите YTDLnis, затем повторите скачивание.");
+                ensureYtDlpInitialized();
+                String searchUrl = "ytsearch" + limit + ":" + query.replace("\n", " ").replace("\r", " ");
+                YoutubeDLRequest request = new YoutubeDLRequest(searchUrl);
+                request.addOption("--flat-playlist");
+                request.addOption("--dump-json");
+                request.addOption("--no-warnings");
+                request.addOption("--ignore-errors");
+                request.addOption("--skip-download");
+                YoutubeDLResponse response = YoutubeDL.getInstance().execute(request, null, null);
+                String output = response == null ? "" : response.getOut();
+                if (output != null) {
+                    for (String line : output.split("\\r?\\n")) {
+                        String row = line == null ? "" : line.trim();
+                        if (!row.startsWith("{") || !row.endsWith("}")) continue;
+                        try {
+                            JSONObject source = new JSONObject(row);
+                            String id = source.optString("id", "").trim();
+                            String sourceUrl = source.optString("webpage_url", "").trim();
+                            if (!isHttpUrl(sourceUrl)) {
+                                String rawUrl = source.optString("url", "").trim();
+                                if (isHttpUrl(rawUrl)) sourceUrl = rawUrl;
+                                else if (!id.isEmpty()) sourceUrl = "https://www.youtube.com/watch?v=" + id;
+                            }
+                            if (id.isEmpty() || !isHttpUrl(sourceUrl)) continue;
+                            JSONObject track = new JSONObject();
+                            String title = source.optString("title", source.optString("fulltitle", "Без названия"));
+                            String artist = source.optString("artist", source.optString("channel", source.optString("uploader", "YouTube")));
+                            String thumbnail = source.optString("thumbnail", "");
+                            put(track, "id", "remote:youtube:" + id);
+                            put(track, "provider", "youtube");
+                            put(track, "providerId", id);
+                            put(track, "title", title);
+                            put(track, "artist", artist);
+                            put(track, "album", source.optString("album", ""));
+                            put(track, "duration", source.optDouble("duration", 0));
+                            put(track, "cover", thumbnail);
+                            put(track, "remoteCover", thumbnail);
+                            put(track, "sourceUrl", sourceUrl);
+                            put(track, "downloadAllowed", true);
+                            results.put(track);
+                            if (results.length() >= limit) break;
+                        } catch (Exception parseError) {
+                            Log.d(TAG, "Skipping unparsed yt-dlp search row", parseError);
+                        }
+                    }
+                }
             } catch (Exception ex) {
-                finishCallback(callbackId, JSONObject.NULL, "Не удалось открыть YTDLnis: " + ex.getMessage());
+                Log.w(TAG, "Built-in yt-dlp search failed", ex);
+            }
+            finishCallback(callbackId, results, null);
+        });
+    }
+
+    @JavascriptInterface public void resolveYtDlp(String raw, int callbackId) {
+        JSONObject payload = parseObject(raw);
+        String url = payload.optString("sourceUrl", payload.optString("url", "")).trim();
+        if (!isHttpUrl(url)) {
+            finishCallback(callbackId, JSONObject.NULL, "У результата нет допустимой веб-ссылки");
+            return;
+        }
+        ytDlpExecutor.execute(() -> {
+            try {
+                ensureYtDlpInitialized();
+                YoutubeDLRequest request = new YoutubeDLRequest(url);
+                request.addOption("-f", "bestaudio/best");
+                request.addOption("--no-playlist");
+                request.addOption("--no-warnings");
+                VideoInfo info = YoutubeDL.getInstance().getInfo(request);
+                String stream = info == null || info.getUrl() == null ? "" : info.getUrl();
+                if (!isHttpUrl(stream) && info != null && info.getFormats() != null) {
+                    for (com.yausername.youtubedl_android.mapper.VideoFormat format : info.getFormats()) {
+                        String audioCodec = format.getAcodec() == null ? "" : format.getAcodec();
+                        String candidate = format.getUrl() == null ? "" : format.getUrl();
+                        if (isHttpUrl(candidate) && !audioCodec.isEmpty() && !"none".equalsIgnoreCase(audioCodec)) {
+                            stream = candidate;
+                            break;
+                        }
+                    }
+                }
+                if (!isHttpUrl(stream)) throw new IOException("Не удалось получить прямой аудиопоток");
+                JSONObject resolved = new JSONObject();
+                put(resolved, "url", stream);
+                put(resolved, "title", info == null ? payload.optString("title", "") : info.getTitle());
+                put(resolved, "artist", info == null ? payload.optString("artist", "") : info.getUploader());
+                put(resolved, "duration", info == null ? 0 : info.getDuration());
+                put(resolved, "cover", info == null ? payload.optString("cover", "") : info.getThumbnail());
+                finishCallback(callbackId, resolved, null);
+            } catch (Exception ex) {
+                Log.w(TAG, "Could not resolve an audio stream", ex);
+                finishCallback(callbackId, JSONObject.NULL, "Не удалось получить аудиопоток: " + (ex.getMessage() == null ? "ошибка yt-dlp" : ex.getMessage()));
             }
         });
+    }
+
+    private String safeDownloadName(String title) {
+        String value = title == null ? "" : title;
+        StringBuilder safe = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') safe.append('_');
+            else if (!Character.isISOControl(c)) safe.append(c);
+        }
+        String name = safe.toString().trim().replaceAll("\\s+", " ");
+        if (name.isEmpty()) name = "Localify track";
+        if (name.length() > 100) name = name.substring(0, 100).trim();
+        return name;
+    }
+
+    private void reportYtDlpProgress(int callbackId, String key, float percent, long eta, String line) {
+        try {
+            JSONObject progress = new JSONObject();
+            put(progress, "key", key);
+            put(progress, "percent", Math.max(0, Math.min(99.5, percent)));
+            put(progress, "eta", Math.max(0, eta));
+            put(progress, "line", line == null ? "" : line);
+            activity.eval("if(window.__localifyAndroidDownloadProgress){window.__localifyAndroidDownloadProgress(" + progress.toString() + ");}");
+        } catch (Exception ignored) {}
+    }
+
+    private JSONObject publishDownloadedAudio(File downloaded, JSONObject source) throws Exception {
+        if (downloaded == null || !downloaded.isFile() || downloaded.length() <= 0) {
+            throw new IOException("yt-dlp не создал MP3-файл");
+        }
+        String name = safeDownloadName(source.optString("title", stripExtension(downloaded.getName()))) + ".mp3";
+        Uri resultUri;
+        ContentResolver resolver = activity.getContentResolver();
+        if (Build.VERSION.SDK_INT >= 29) {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Audio.Media.DISPLAY_NAME, name);
+            values.put(MediaStore.Audio.Media.MIME_TYPE, "audio/mpeg");
+            values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/Localify Downloads");
+            values.put(MediaStore.Audio.Media.IS_PENDING, 1);
+            resultUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+            if (resultUri == null) throw new IOException("Не удалось создать файл в Music/Localify Downloads");
+            try {
+                try (InputStream input = new FileInputStream(downloaded);
+                     java.io.OutputStream output = resolver.openOutputStream(resultUri, "w")) {
+                    if (output == null) throw new IOException("Не удалось записать скачанный файл");
+                    byte[] buffer = new byte[32768]; int count;
+                    while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+                    output.flush();
+                }
+                ContentValues ready = new ContentValues();
+                ready.put(MediaStore.Audio.Media.IS_PENDING, 0);
+                resolver.update(resultUri, ready, null, null);
+            } catch (Exception ex) {
+                try { resolver.delete(resultUri, null, null); } catch (Exception ignored) {}
+                throw ex;
+            }
+        } else {
+            File ext = activity.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+            File music = new File(ext == null ? activity.getFilesDir() : ext, "Localify Downloads");
+            if (!music.exists() && !music.mkdirs()) throw new IOException("Не удалось создать папку загрузок");
+            File output = new File(music, name);
+            if (output.exists()) output = new File(music, safeDownloadName(source.optString("title", "Localify track")) + "-" + System.currentTimeMillis() + ".mp3");
+            try (InputStream input = new FileInputStream(downloaded); java.io.OutputStream outputStream = new FileOutputStream(output)) {
+                byte[] buffer = new byte[32768]; int count;
+                while ((count = input.read(buffer)) >= 0) outputStream.write(buffer, 0, count);
+                outputStream.flush();
+            }
+            resultUri = Uri.fromFile(output);
+        }
+        JSONObject localTrack = makeTrack(resultUri, name, System.currentTimeMillis());
+        if (localTrack == null) throw new IOException("Файл скачан, но не удалось прочитать его метаданные");
+        put(localTrack, "provider", "local");
+        put(localTrack, "downloadedPath", resultUri.toString());
+        put(localTrack, "downloadSourceUrl", source.optString("sourceUrl", ""));
+        put(localTrack, "downloadAllowed", false);
+        JSONObject result = new JSONObject();
+        put(result, "path", resultUri.toString());
+        put(result, "format", "mp3");
+        put(result, "duplicate", false);
+        result.put("track", localTrack);
+        return result;
+    }
+
+    @JavascriptInterface public void downloadYtDlp(String raw, int callbackId) {
+        JSONObject payload = parseObject(raw);
+        String url = payload.optString("sourceUrl", payload.optString("url", "")).trim();
+        String provider = payload.optString("provider", "");
+        if (!"youtube".equals(provider) || !isHttpUrl(url)) {
+            finishCallback(callbackId, JSONObject.NULL, "Для встроенного скачивания выберите результат YouTube");
+            return;
+        }
+        final String key = payload.optString("key", payload.optString("providerId", payload.optString("id", "")));
+        ytDlpExecutor.execute(() -> {
+            File workDir = null;
+            try {
+                ensureYtDlpInitialized();
+                workDir = new File(activity.getCacheDir(), "yt-dlp-" + callbackId + "-" + System.currentTimeMillis());
+                if (!workDir.mkdirs() && !workDir.isDirectory()) throw new IOException("Не удалось создать временную папку загрузки");
+                File outputTemplate = new File(workDir, "%(title).150B.%(ext)s");
+                YoutubeDLRequest request = new YoutubeDLRequest(url);
+                request.addOption("-x");
+                request.addOption("--audio-format", "mp3");
+                request.addOption("--audio-quality", "192K");
+                request.addOption("--embed-metadata");
+                request.addOption("--embed-thumbnail");
+                request.addOption("--convert-thumbnails", "jpg");
+                request.addOption("--no-playlist");
+                request.addOption("--newline");
+                request.addOption("-o", outputTemplate.getAbsolutePath());
+                YoutubeDLResponse response = YoutubeDL.getInstance().execute(request, null, (progress, eta, line) -> {
+                    float percentage = progress == null ? 0f : progress.floatValue();
+                    long remaining = eta == null ? 0L : eta.longValue();
+                    reportYtDlpProgress(callbackId, key, percentage, remaining, line);
+                    return kotlin.Unit.INSTANCE;
+                });
+                if (response == null || response.getExitCode() != 0) {
+                    throw new IOException("yt-dlp завершился с ошибкой");
+                }
+                File[] outputs = workDir.listFiles((dir, filename) -> filename.toLowerCase(Locale.ROOT).endsWith(".mp3") && !filename.endsWith(".part"));
+                if (outputs == null || outputs.length == 0) throw new IOException("После обработки MP3-файл не найден");
+                java.util.Arrays.sort(outputs, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+                JSONObject result = publishDownloadedAudio(outputs[0], payload);
+                reportYtDlpProgress(callbackId, key, 100f, 0, "Готово");
+                finishCallback(callbackId, result, null);
+            } catch (Exception ex) {
+                Log.e(TAG, "Built-in yt-dlp download failed", ex);
+                finishCallback(callbackId, JSONObject.NULL, ex.getMessage() == null ? "Не удалось скачать трек через yt-dlp" : ex.getMessage());
+            } finally {
+                if (workDir != null && workDir.exists()) deleteRecursively(workDir);
+            }
+        });
+    }
+
+    private void deleteRecursively(File file) {
+        if (file == null || !file.exists()) return;
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteRecursively(child);
+        try { file.delete(); } catch (Exception ignored) {}
     }
 
     @JavascriptInterface public void updatePlayback(String raw) {
