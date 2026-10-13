@@ -487,7 +487,7 @@ public class LocalifyAndroidBridge {
         JSONArray out = new JSONArray(); if (query == null || query.trim().isEmpty()) return out;
         String endpoint = "https://itunes.apple.com/search?media=music&entity=song&limit=" + limit + "&term=" + URLEncoder.encode(query, "UTF-8");
         HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
-        connection.setConnectTimeout(8000); connection.setReadTimeout(10000); connection.setRequestProperty("User-Agent", "LocalifyCrimson-Android/1.1.1");
+        connection.setConnectTimeout(4500); connection.setReadTimeout(5500); connection.setRequestProperty("User-Agent", "LocalifyCrimson-Android/1.2.0");
         try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192]; int n; while ((n = input.read(buffer)) >= 0) output.write(buffer, 0, n);
             JSONObject root = new JSONObject(output.toString("UTF-8")); JSONArray rows = root.optJSONArray("results"); if (rows == null) return out;
@@ -535,6 +535,28 @@ public class LocalifyAndroidBridge {
             android.content.Context appContext = activity.getApplicationContext();
             YoutubeDL.getInstance().init(appContext);
             FFmpeg.getInstance().init(appContext);
+
+            // The APK contains a fixed yt-dlp snapshot. YouTube frequently changes its
+            // player APIs, so refresh the embedded script from the official NIGHTLY
+            // channel at most once per week. If offline, keep the bundled copy and
+            // retry tomorrow rather than preventing local/iTunes playback.
+            final String updateKey = "ytDlpLastUpdateAttemptAt";
+            final long now = System.currentTimeMillis();
+            final long dayMs = 24L * 60L * 60L * 1000L;
+            long lastAttempt = prefs.getLong(updateKey, 0L);
+            if (now - lastAttempt >= 7L * dayMs) {
+                prefs.edit().putLong(updateKey, now).apply();
+                try {
+                    YoutubeDL.getInstance().updateYoutubeDL(
+                        appContext, YoutubeDL.UpdateChannel._NIGHTLY
+                    );
+                    String version = YoutubeDL.getInstance().version(appContext);
+                    Log.i(TAG, "yt-dlp update check finished; version=" + version);
+                } catch (Exception updateError) {
+                    Log.w(TAG, "yt-dlp update failed; using bundled version and retrying tomorrow", updateError);
+                    prefs.edit().putLong(updateKey, now - 6L * dayMs).apply();
+                }
+            }
             ytDlpInitialized = true;
         }
     }
@@ -564,7 +586,7 @@ public class LocalifyAndroidBridge {
     @JavascriptInterface public void searchYtDlp(String raw, int callbackId) {
         JSONObject payload = parseObject(raw);
         String query = payload.optString("query", "").trim();
-        final int limit = Math.max(1, Math.min(12, payload.optInt("limit", 10)));
+        final int limit = Math.max(1, Math.min(6, payload.optInt("limit", 6)));
         if (query.isEmpty() || query.length() > 180) {
             finishCallback(callbackId, new JSONArray(), null);
             return;
@@ -580,6 +602,8 @@ public class LocalifyAndroidBridge {
                 request.addOption("--no-warnings");
                 request.addOption("--ignore-errors");
                 request.addOption("--skip-download");
+                request.addOption("--socket-timeout", "10");
+                request.addOption("--extractor-retries", "1");
                 YoutubeDLResponse response = YoutubeDL.getInstance().execute(request, null, null);
                 String output = response == null ? "" : response.getOut();
                 if (output != null) {
@@ -599,7 +623,8 @@ public class LocalifyAndroidBridge {
                             JSONObject track = new JSONObject();
                             String title = source.optString("title", source.optString("fulltitle", "Без названия"));
                             String artist = source.optString("artist", source.optString("channel", source.optString("uploader", "YouTube")));
-                            String thumbnail = source.optString("thumbnail", "");
+                            String thumbnail = source.optString("thumbnail", "").trim();
+                            if (thumbnail.isEmpty()) thumbnail = "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
                             put(track, "id", "remote:youtube:" + id);
                             put(track, "provider", "youtube");
                             put(track, "providerId", id);
@@ -639,6 +664,8 @@ public class LocalifyAndroidBridge {
                 request.addOption("-f", "bestaudio/best");
                 request.addOption("--no-playlist");
                 request.addOption("--no-warnings");
+                request.addOption("--socket-timeout", "10");
+                request.addOption("--extractor-retries", "1");
                 VideoInfo info = YoutubeDL.getInstance().getInfo(request);
                 String stream = info == null || info.getUrl() == null ? "" : info.getUrl();
                 if (!isHttpUrl(stream) && info != null && info.getFormats() != null) {
