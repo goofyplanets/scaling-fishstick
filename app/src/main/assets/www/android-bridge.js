@@ -21,6 +21,20 @@
       try { native.scanLibraryFolder(id); } catch (error) { pending.delete(id); reject(error); }
     });
   }
+  function nativePayloadRequest(method, payload) {
+    return new Promise((resolve, reject) => {
+      const id = ++requestId;
+      pending.set(id, {resolve, reject});
+      try {
+        const fn = native[method];
+        if (typeof fn !== 'function') throw new Error('Встроенный загрузчик недоступен в этой сборке');
+        fn.call(native, JSON.stringify(payload || {}), id);
+      } catch (error) {
+        pending.delete(id);
+        reject(error);
+      }
+    });
+  }
   window.__localifyAndroidResolve = (id, serialized, error) => {
     const item = pending.get(Number(id)); if (!item) return;
     pending.delete(Number(id));
@@ -84,18 +98,34 @@
     providers: {
       getConfig: () => Promise.resolve(config()),
       saveConfig: data => Promise.resolve(native.saveProviderConfig(JSON.stringify(data || {}))),
-      onlineSearch: payload => Promise.resolve(parse(native.onlineSearch(JSON.stringify(payload || {})), [])),
+      onlineSearch: async payload => {
+        const local = parse(native.onlineSearch(JSON.stringify(payload || {})), []);
+        try {
+          const found = await nativePayloadRequest('searchYtDlp', payload || {});
+          const remote = Array.isArray(found) ? found : parse(found, []);
+          const seen = new Set();
+          return [...remote, ...local].filter(item => {
+            const key = String(item?.providerId || item?.sourceUrl || item?.title || '').toLowerCase();
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        } catch (error) {
+          console.warn('yt-dlp search unavailable; showing Apple music previews:', error);
+          return local;
+        }
+      },
       openSource: url => Promise.resolve(native.openExternal(String(url || ''))),
-      downloadWithYtdlnis: payload => new Promise((resolve,reject) => {
-        const id=++requestId; pending.set(id,{resolve,reject});
-        try { native.downloadWithYtdlnis(JSON.stringify(payload||{}),id); }
-        catch(error) { pending.delete(id); reject(error); }
-      }),
       diagnostics: () => Promise.resolve(parse(native.providerDiagnostics(), {})),
-      onDownloadProgress: none,
-      downloadYtDlp: () => Promise.reject(new Error('Загрузка через yt-dlp пока не реализована в Android-сборке. Доступны онлайн-превью.')),
-      resolveYtDlp: () => Promise.reject(new Error('yt-dlp не входит в Android-сборку.')),
-      updateYtDlp: () => Promise.reject(new Error('Обновление yt-dlp недоступно в Android-сборке.')),
+      onDownloadProgress: callback => {
+        window.__localifyAndroidDownloadProgress = data => {
+          try { callback(typeof data === 'string' ? parse(data, {}) : (data || {})); }
+          catch (error) { console.warn('Download progress callback failed', error); }
+        };
+      },
+      downloadYtDlp: payload => nativePayloadRequest('downloadYtDlp', payload || {}),
+      resolveYtDlp: payload => nativePayloadRequest('resolveYtDlp', payload || {}),
+      updateYtDlp: () => Promise.reject(new Error('Автообновление встроенного yt-dlp пока не поддерживается; используется версия в APK.')),
       chooseYtDlp: () => Promise.resolve(''), chooseCookiesFile: () => Promise.resolve('')
     },
     playlists: {
