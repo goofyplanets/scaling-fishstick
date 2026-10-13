@@ -297,8 +297,8 @@ public class LocalifyAndroidBridge {
         Uri rootDoc = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId);
         boolean[] queryFailed = new boolean[]{false};
         scanDocument(treeUri, rootDoc, depth, tracks, new HashSet<String>(), cachedTracks, queryFailed);
-        if (tracks.length() == 0 && queryFailed[0]) {
-            throw new IOException("Не удалось прочитать содержимое музыкальной папки. Проверьте доступ к папке или выберите её заново в настройках.");
+        if (queryFailed[0]) {
+            throw new IOException("Не удалось полностью прочитать музыкальную папку. Проверьте доступ к папке или выберите её заново в настройках.");
         }
         return tracks;
     }
