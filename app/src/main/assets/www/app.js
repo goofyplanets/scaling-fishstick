@@ -1184,9 +1184,19 @@ function applyDownloadedCover(result){
 }
 async function downloadRecommendation(track){
   if(!track || !track.artist || !track.title) return;
-  if(window.__LOCALIFY_ANDROID__){ toast('В Android-версии доступны онлайн-превью. Скачивание через yt-dlp не входит в эту сборку.'); return; }
+  if(window.__LOCALIFY_ANDROID__ && track.provider!=='youtube'){ toast('Для встроенного скачивания выбери результат YouTube, а не iTunes-превью.'); return; }
   const key=downloadKey(track); state.downloadProgress.set(key,0); updateDownloadProgress({key,percent:0});
-  try { const result=await window.localify.providers.downloadYtDlp(track); track.downloadedPath=result?.path||''; state.downloadProgress.set(key,100); updateDownloadProgress({key,percent:100,status:'done'}); toast(result?.duplicate ? 'Такой трек уже есть в библиотеке' : (result?.audioFallback ? `FFmpeg не найден: трек сохранён в ${String(result?.format||'m4a').toUpperCase()} без перекодирования` : 'Трек скачан через yt-dlp в «Localify Downloads»')); await syncConfiguredLibrary(true); applyDownloadedCover(result); state.onlineCache.clear(); updateDownloadButton(); }
+  try { const result=await window.localify.providers.downloadYtDlp({...track,key}); track.downloadedPath=result?.path||''; state.downloadProgress.set(key,100); updateDownloadProgress({key,percent:100,status:'done'}); if(window.__LOCALIFY_ANDROID__ && result?.track) {
+    const downloaded={...result.track,downloadedPath:result.path||result.track.downloadedPath||''};
+    const existingIndex=findLibraryIndexById(downloaded.id);
+    if(existingIndex>=0) state.library[existingIndex]=downloaded; else state.library.push(downloaded);
+    rebuildLibraryIndexes(); await save(); renderAll();
+    toast('Трек скачан в «Music/Localify Downloads» и добавлен в библиотеку');
+  } else {
+    toast(result?.duplicate ? 'Такой трек уже есть в библиотеке' : (result?.audioFallback ? `FFmpeg не найден: трек сохранён в ${String(result?.format||'m4a').toUpperCase()} без перекодирования` : 'Трек скачан через yt-dlp в «Localify Downloads»'));
+    await syncConfiguredLibrary(true); applyDownloadedCover(result);
+  }
+  state.onlineCache.clear(); updateDownloadButton(); }
   catch(err){ console.error(err); state.downloadProgress.delete(key); updateDownloadButton(); toast(err?.message||'Не удалось скачать трек через yt-dlp'); }
 }
 async function downloadCurrentRemoteTrack(){
@@ -1782,25 +1792,19 @@ function renderOnlineSearch(){
   const box=$('#onlineSearchResults'); if(!box) return;
   const q=state.search.trim();
   const status=$('#onlineSearchStatus');
-  if(status) status.textContent=state.onlineSearchLoading ? (window.__LOCALIFY_ANDROID__ ? `Ищу музыкальные превью для «${q}»…` : `Ищу «${q}» на YouTube…`) : (q ? `Результаты для «${q}»` : 'Введите запрос в поиске выше');
+  if(status) status.textContent=state.onlineSearchLoading ? (window.__LOCALIFY_ANDROID__ ? `Ищу на YouTube и в музыкальных превью для «${q}»…` : `Ищу «${q}» на YouTube…`) : (q ? `Результаты для «${q}»` : 'Введите запрос в поиске выше');
   if(state.onlineSearchLoading){ box.innerHTML=`<div class="empty online-loading">${window.__LOCALIFY_ANDROID__?'Поиск музыкальных превью…':'Поиск через yt-dlp…'}</div>`; return; }
   const list=state.onlineSearchResults||[];
   box.innerHTML=list.length ? list.map((c,i)=>{
-    const canUseYtdlnis=!!window.__LOCALIFY_ANDROID__ && c.provider!=='itunes' && /^https?:\/\//i.test(String(c.sourceUrl||''));
+    const canUseYtdlnis=false;
     return `<article class="online-card"><div class="online-cover">${coverHtml(c.cover) || uiIcon('play')}</div><div class="online-copy"><div class="remote-provider">${c.provider==='itunes'?'iTunes Preview':'YouTube'}</div><h3>${esc(c.title)}</h3><p>${esc(c.artist)}${c.duration?` · ${fmtTime(c.duration)}`:''}</p><div class="library-match">${esc(libraryMatchLabel(c))}</div><small>${esc(c.sourceUrl||'')}</small><div class="remote-actions"><button type="button" class="primary small-btn" data-online-play="${i}">${uiIcon('play')} Слушать</button><button type="button" class="secondary small-btn" data-online-download="${i}" data-download-track="${esc(downloadKey(c))}">${uiIcon('download')} Скачать</button>${canUseYtdlnis?`<button type="button" class="secondary small-btn" data-online-ytdlnis="${i}">${uiIcon('download')} Скачать через YTDLnis</button>`:''}<button type="button" class="secondary small-btn" data-online-source="${i}">${uiIcon('external')} ${c.provider==='itunes'?'Открыть страницу':'Открыть YouTube'}</button></div></div></article>`;
   }).join('') : `<div class="empty">${q?'Ничего не найдено. Проверьте yt-dlp и интернет-соединение.':'Введите запрос для онлайн-поиска.'}</div>`;
   box.onclick=async e=>{
-    const btn=e.target.closest('[data-online-play],[data-online-download],[data-online-source],[data-online-ytdlnis]'); if(!btn)return;
-    const i=Number(btn.dataset.onlinePlay??btn.dataset.onlineDownload??btn.dataset.onlineSource??btn.dataset.onlineYtdlnis); const track=state.onlineSearchResults[i]; if(!track)return;
+    const btn=e.target.closest('[data-online-play],[data-online-download],[data-online-source]'); if(!btn)return;
+    const i=Number(btn.dataset.onlinePlay??btn.dataset.onlineDownload??btn.dataset.onlineSource); const track=state.onlineSearchResults[i]; if(!track)return;
     if(btn.dataset.onlinePlay!==undefined) return playRemoteTrack(track);
     if(btn.dataset.onlineDownload!==undefined) return downloadRecommendation(track);
-    if(btn.dataset.onlineYtdlnis!==undefined) {
-      if(!window.localify.providers.downloadWithYtdlnis){ toast('Интеграция YTDLnis доступна только в Android-сборке'); return; }
-      try { await window.localify.providers.downloadWithYtdlnis({url:track.sourceUrl,title:track.title,artist:track.artist}); toast('Трек передан в YTDLnis'); }
-      catch(err) { console.error(err); toast(err?.message||'Не удалось открыть YTDLnis. Проверьте, что приложение установлено.'); }
-      return;
-    }
-    try{ await window.localify.providers.openSource(track.sourceUrl); }catch(err){ console.error(err); toast('Не удалось открыть YouTube'); }
+    try{ await window.localify.providers.openSource(track.sourceUrl); }catch(err){ console.error(err); toast('Не удалось открыть источник'); }
   };
 }
 function closeSearchSuggestions(){ const box=$('#searchSuggestions'); if(box){ box.hidden=true; state.searchSuggestionsOpen=false; } }
