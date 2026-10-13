@@ -411,3 +411,7 @@ html.android-app #settingsView .android-only-card .setting-row { align-items:fle
 html.android-app #settingsView .android-only-card .setting-row > div { flex:1 1 auto; min-width:0; }
 html.android-app #settingsView #settingAndroidDownloadMode { flex:0 1 220px; max-width:100%; }
 html.android-app #settingsView .android-only-card .provider-hint { line-height:1.55; }
+
+html.android-app [class*="playlist"],
+html.android-app [data-home-action*="playlist"],
+html.android-app [data-action*="playlist"] { display:none !important; }
