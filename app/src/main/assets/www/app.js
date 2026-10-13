@@ -1776,6 +1776,23 @@ async function runOnlineSearch(query=state.search, openView=true){
       if(token===state.onlineSearchToken) state.onlineSearchResults=filterOnlineResults(cached.results);
       return state.onlineSearchResults;
     }
+    if (window.__LOCALIFY_ANDROID__) {
+      window.__localifyAndroidSearchUpdate = payload => {
+        const returnedQuery = String(payload?.query || '').trim().toLocaleLowerCase();
+        if (token !== state.onlineSearchToken || returnedQuery !== q.toLocaleLowerCase()) return;
+        if (payload?.error) {
+          console.warn('YouTube search failed:', payload.error);
+          if (!state.onlineSearchResults.length) toast('Поиск YouTube не удался: ' + String(payload.error));
+          return;
+        }
+        const remote = filterOnlineResults(Array.isArray(payload?.results) ? payload.results : []);
+        if (!remote.length) return;
+        const merged = filterOnlineResults([...(state.onlineSearchResults || []), ...remote]);
+        state.onlineSearchResults = merged;
+        setOnlineCache(cacheKey, {at: Date.now(), results: merged});
+        renderOnlineSearch();
+      };
+    }
     const results=await window.localify.providers.onlineSearch({query:q,limit:12,localLibrary:state.library.map(t=>({title:t.title,artist:t.artist,provider:t.provider,providerId:t.providerId}))});
     if(token!==state.onlineSearchToken) return state.onlineSearchResults;
     const filtered=filterOnlineResults(results||[]);
@@ -2346,7 +2363,11 @@ async function playCurrentPlayback() {
   updateNowPlaying(track);
   window.localify.playback.nowPlaying(nativePlaybackPayload(false));
   const p=audio.play();
-  if(p?.then) p.then(()=>syncPlayButton(true)).catch(()=>syncPlayButton(false));
+  if(p?.then) p.then(()=>syncPlayButton(true)).catch(err=>{
+    syncPlayButton(false);
+    console.warn('Audio playback failed', err);
+    if(track.provider==='youtube' || track.provider==='itunes') toast('Не удалось воспроизвести онлайн-аудио. Попробуй другой результат или повтори поиск.');
+  });
   markTrackPlayed(track);
   addHistory(track);
   saveQueueSnapshot();
