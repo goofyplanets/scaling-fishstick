@@ -128,14 +128,20 @@ public class LocalifyAndroidBridge {
         JSONObject out = new JSONObject();
         JSONObject ytdlp = new JSONObject(); JSONObject ffmpeg = new JSONObject(); JSONObject cookies = new JSONObject();
         try {
-            ytdlp.put("available", false); ytdlp.put("version", "не входит в Android-сборку"); ytdlp.put("updateAvailable", false); ytdlp.put("path", "");
-            ffmpeg.put("available", false); cookies.put("sources", new JSONObject()); cookies.put("file", "");
+            String version = "встроен; проверка обновления при первом онлайн-поиске";
+            if (ytDlpInitialized) {
+                String installedVersion = YoutubeDL.getInstance().version(activity.getApplicationContext());
+                if (installedVersion != null && !installedVersion.trim().isEmpty()) version = installedVersion;
+            }
+            ytdlp.put("available", true); ytdlp.put("version", version); ytdlp.put("updateAvailable", false);
+            ytdlp.put("path", "внутреннее хранилище приложения"); ytdlp.put("autoUpdate", true); ytdlp.put("channel", "nightly");
+            ffmpeg.put("available", true); cookies.put("sources", new JSONObject()); cookies.put("file", "");
             out.put("ytDlp", ytdlp); out.put("ffmpeg", ffmpeg); out.put("cookies", cookies);
-            out.put("jsRuntime", "Android WebView"); out.put("readyForMp3", false); out.put("platform", "android");
+            out.put("jsRuntime", "Android WebView"); out.put("readyForMp3", true); out.put("platform", "android");
         } catch (Exception ignored) {}
         return out.toString();
     }
-    @JavascriptInterface public String diagnosticsReport() { return "Localify Crimson Android\nVersion 1.1.1-android-preview\nRuntime: Android WebView\nLocal file playback: MediaStore/Storage Access Framework\nYouTube yt-dlp/FFmpeg: not bundled\n"; }
+    @JavascriptInterface public String diagnosticsReport() { return "Localify Crimson Android\\nVersion 1.2.0-android-preview\\nRuntime: Android WebView\\nLocal file playback: MediaStore/Storage Access Framework\\nYouTube yt-dlp/FFmpeg: bundled; yt-dlp auto-update from official NIGHTLY channel\\n"; }
     @JavascriptInterface public String getLogs(int lines) { return "Логи Android доступны через системный журнал приложения."; }
     @JavascriptInterface public boolean clearLogs() { return true; }
     @JavascriptInterface public String logsDirectory() { return dataDir.getAbsolutePath(); }
@@ -568,6 +574,25 @@ public class LocalifyAndroidBridge {
             return (scheme.equals("https") || scheme.equals("http"))
                 && uri.getHost() != null && rawUrl.length() <= 4096;
         } catch (Exception ignored) { return false; }
+    }
+
+    @JavascriptInterface public void updateYtDlp(String raw, int callbackId) {
+        ytDlpExecutor.execute(() -> {
+            try {
+                ensureYtDlpInitialized();
+                android.content.Context appContext = activity.getApplicationContext();
+                YoutubeDL.getInstance().updateYoutubeDL(appContext, YoutubeDL.UpdateChannel._NIGHTLY);
+                prefs.edit().putLong("ytDlpLastUpdateAttemptAt", System.currentTimeMillis()).apply();
+                String version = YoutubeDL.getInstance().version(appContext);
+                JSONObject result = new JSONObject();
+                put(result, "updated", true);
+                put(result, "version", version == null ? "unknown" : version);
+                finishCallback(callbackId, result, null);
+            } catch (Exception ex) {
+                Log.w(TAG, "Manual yt-dlp update failed", ex);
+                finishCallback(callbackId, JSONObject.NULL, ex.getMessage() == null ? "Не удалось обновить yt-dlp" : ex.getMessage());
+            }
+        });
     }
 
     @JavascriptInterface public void searchItunes(String raw, int callbackId) {
