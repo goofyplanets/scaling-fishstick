@@ -699,7 +699,7 @@ public class LocalifyAndroidBridge {
             try {
                 ensureYtDlpInitialized();
                 YoutubeDLRequest request = new YoutubeDLRequest(url);
-                request.addOption("-f", "bestaudio/best");
+                request.addOption("-f", "bestaudio[ext=m4a]/bestaudio/best");
                 request.addOption("--no-playlist");
                 request.addOption("--no-warnings");
                 request.addOption("--no-update");
@@ -849,16 +849,23 @@ public class LocalifyAndroidBridge {
             File workDir = null;
             try {
                 ensureYtDlpInitialized();
+                JSONObject savedSettings = readJsonFile("settings.json", defaultSettings());
+                boolean originalAudio = "original".equalsIgnoreCase(savedSettings.optString("downloadMode", "mp3"));
                 workDir = new File(activity.getCacheDir(), "yt-dlp-" + callbackId + "-" + System.currentTimeMillis());
                 if (!workDir.mkdirs() && !workDir.isDirectory()) throw new IOException("Не удалось создать временную папку загрузки");
                 File outputTemplate = new File(workDir, "%(title).150B.%(ext)s");
                 YoutubeDLRequest request = new YoutubeDLRequest(url);
-                request.addOption("-x");
-                request.addOption("--audio-format", "mp3");
-                request.addOption("--audio-quality", "192K");
-                request.addOption("--embed-metadata");
-                request.addOption("--embed-thumbnail");
-                request.addOption("--convert-thumbnails", "jpg");
+                if (originalAudio) {
+                    // Skip FFmpeg transcoding for faster downloads; keep YouTube's source audio container.
+                    request.addOption("-f", "bestaudio[ext=m4a]/bestaudio");
+                } else {
+                    request.addOption("-x");
+                    request.addOption("--audio-format", "mp3");
+                    request.addOption("--audio-quality", "192K");
+                    request.addOption("--embed-metadata");
+                    request.addOption("--embed-thumbnail");
+                    request.addOption("--convert-thumbnails", "jpg");
+                }
                 request.addOption("--no-playlist");
                 request.addOption("--newline");
                 request.addOption("--no-update");
@@ -874,7 +881,7 @@ public class LocalifyAndroidBridge {
                 if (response == null || response.getExitCode() != 0) {
                     throw new IOException("yt-dlp завершился с ошибкой");
                 }
-                File[] outputs = workDir.listFiles((dir, filename) -> filename.toLowerCase(Locale.ROOT).endsWith(".mp3") && !filename.endsWith(".part"));
+                File[] outputs = workDir.listFiles((dir, filename) -> filename.toLowerCase(Locale.ROOT).matches(".*\\.(mp3|m4a|opus|webm|aac|ogg)$") && !filename.endsWith(".part"));
                 if (outputs == null || outputs.length == 0) throw new IOException("После обработки MP3-файл не найден");
                 java.util.Arrays.sort(outputs, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
                 JSONObject result = publishDownloadedAudio(outputs[0], payload);
