@@ -52,6 +52,7 @@
     pickFiles: () => request('pickFiles'),
     pickFolder: () => request('pickFolder'),
     chooseLibraryFolder: () => request('chooseLibraryFolder'),
+    chooseDownloadFolder: () => request('chooseDownloadFolder'),
     scanLibraryFolder: () => scan(),
     scanLibraryChange: () => Promise.resolve({}),
     scanLibraryChanges: () => Promise.resolve([]),
