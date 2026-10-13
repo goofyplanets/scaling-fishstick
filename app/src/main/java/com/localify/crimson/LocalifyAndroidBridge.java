@@ -548,6 +548,19 @@ public class LocalifyAndroidBridge {
         } catch (Exception ignored) { return false; }
     }
 
+    @JavascriptInterface public void searchItunes(String raw, int callbackId) {
+        JSONObject payload = parseObject(raw);
+        String query = payload.optString("query", "").trim();
+        int limit = Math.max(1, Math.min(20, payload.optInt("limit", 12)));
+        ytDlpExecutor.execute(() -> {
+            try { finishCallback(callbackId, itunesSearch(query, limit), null); }
+            catch (Exception ex) {
+                Log.w(TAG, "iTunes preview search failed", ex);
+                finishCallback(callbackId, new JSONArray(), null);
+            }
+        });
+    }
+
     @JavascriptInterface public void searchYtDlp(String raw, int callbackId) {
         JSONObject payload = parseObject(raw);
         String query = payload.optString("query", "").trim();

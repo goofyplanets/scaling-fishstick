@@ -99,21 +99,19 @@
       getConfig: () => Promise.resolve(config()),
       saveConfig: data => Promise.resolve(native.saveProviderConfig(JSON.stringify(data || {}))),
       onlineSearch: async payload => {
-        const local = parse(native.onlineSearch(JSON.stringify(payload || {})), []);
-        try {
-          const found = await nativePayloadRequest('searchYtDlp', payload || {});
-          const remote = Array.isArray(found) ? found : parse(found, []);
-          const seen = new Set();
-          return [...remote, ...local].filter(item => {
-            const key = String(item?.providerId || item?.sourceUrl || item?.title || '').toLowerCase();
-            if (!key || seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-        } catch (error) {
-          console.warn('yt-dlp search unavailable; showing Apple music previews:', error);
-          return local;
-        }
+        const queries = await Promise.all([
+          nativePayloadRequest('searchYtDlp', payload || {}).catch(error => { console.warn('YouTube search failed', error); return []; }),
+          nativePayloadRequest('searchItunes', payload || {}).catch(error => { console.warn('iTunes preview search failed', error); return []; })
+        ]);
+        const remote = Array.isArray(queries[0]) ? queries[0] : parse(queries[0], []);
+        const local = Array.isArray(queries[1]) ? queries[1] : parse(queries[1], []);
+        const seen = new Set();
+        return [...remote, ...local].filter(item => {
+          const key = String(item?.provider + ':' + (item?.providerId || item?.sourceUrl || item?.title || '')).toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
       },
       openSource: url => Promise.resolve(native.openExternal(String(url || ''))),
       diagnostics: () => Promise.resolve(parse(native.providerDiagnostics(), {})),
