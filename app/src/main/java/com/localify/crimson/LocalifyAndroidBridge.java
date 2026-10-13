@@ -141,7 +141,7 @@ public class LocalifyAndroidBridge {
         } catch (Exception ignored) {}
         return out.toString();
     }
-    @JavascriptInterface public String diagnosticsReport() { return "Localify Crimson Android\\nVersion 1.2.0-android-preview\\nRuntime: Android WebView\\nLocal file playback: MediaStore/Storage Access Framework\\nYouTube yt-dlp/FFmpeg: bundled; yt-dlp auto-update from official NIGHTLY channel\\n"; }
+    @JavascriptInterface public String diagnosticsReport() { return "Localify Crimson Android\\nVersion 1.2.1-android-preview\\nRuntime: Android WebView\\nLocal file playback: MediaStore/Storage Access Framework\\nYouTube yt-dlp/FFmpeg: bundled; yt-dlp auto-update from official NIGHTLY channel\\n"; }
     @JavascriptInterface public String getLogs(int lines) { return "Логи Android доступны через системный журнал приложения."; }
     @JavascriptInterface public boolean clearLogs() { return true; }
     @JavascriptInterface public String logsDirectory() { return dataDir.getAbsolutePath(); }
