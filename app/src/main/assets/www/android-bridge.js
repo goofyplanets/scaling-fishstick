@@ -105,8 +105,7 @@
         const results = Array.isArray(value) ? value : parse(value, []);
         const seen = new Set();
         return results.filter(item => {
-          // Android online search is intentionally YouTube-only: no short Apple
-          // Music/iTunes preview results mixed into this list.
+          // Android online search intentionally returns YouTube results only.
           if (item?.provider !== 'youtube') return false;
           const key = String(item.providerId || item.sourceUrl || item.title || '').toLowerCase();
           if (!key || seen.has(key)) return false;
