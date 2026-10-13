@@ -820,9 +820,13 @@ function setupDialogAccessibility() {
   $('#mobileNavToggle')?.addEventListener('click', () => setMobileSidebarOpen(!document.body.classList.contains('mobile-sidebar-open')));
   $('#mobileSearchToggle')?.addEventListener('click', () => setMobileSearchOpen(true));
   $('#mobileSearchClose')?.addEventListener('click', () => setMobileSearchOpen(false));
-  $('.sidebar .nav-item').forEach(btn => btn.addEventListener('click', closeMobileSidebar));
+  $('#mobileSidebarBackdrop')?.addEventListener('click', closeMobileSidebar);
+  $$('.sidebar .nav-item').forEach(btn => btn.addEventListener('click', closeMobileSidebar));
   document.addEventListener('click', e => {
-    if (document.body.classList.contains('mobile-sidebar-open') && !e.target.closest('.sidebar') && !e.target.closest('#mobileNavToggle')) closeMobileSidebar();
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target || !document.body.classList.contains('mobile-sidebar-open')) return;
+    if (target.closest('.sidebar') || target.closest('#mobileNavToggle') || target.closest('#mobileSidebarBackdrop')) return;
+    closeMobileSidebar();
   }, true);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.body.classList.contains('mobile-sidebar-open')) closeMobileSidebar();
@@ -1902,9 +1906,21 @@ function bindTrackActions(root) {
         const id=row.dataset.id;
         if(state.selectedTrackIds.has(id)) state.selectedTrackIds.delete(id); else state.selectedTrackIds.add(id);
         renderLibrarySelectionBar(); renderVirtualTable(document.querySelector('#trackTable'), getSortedVisibleTracks());
+        return;
       }
+      const isAndroid = document.documentElement.classList.contains('android-app');
+      const isTrackRow = row.classList.contains('track') && !row.classList.contains('track-header');
+      const target = e.target instanceof Element ? e.target : null;
+      if (!isAndroid || !isTrackRow || target?.closest('button,a,input,select,textarea,[data-menu],[data-refresh],[data-delete],[data-remove-playlist]')) return;
+      const now = Date.now();
+      if (state._lastMobilePlayId === row.dataset.id && now - (state._lastMobilePlayAt || 0) < 450) return;
+      state._lastMobilePlayId = row.dataset.id;
+      state._lastMobilePlayAt = now;
+      playTrackById(row.dataset.id, row.dataset.playbackSource || 'library');
     });
-    row.addEventListener('dblclick', () => playTrackById(row.dataset.id, row.dataset.playbackSource || 'library'));
+    row.addEventListener('dblclick', () => {
+      if (!document.documentElement.classList.contains('android-app')) playTrackById(row.dataset.id, row.dataset.playbackSource || 'library');
+    });
     row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', row.dataset.id); e.dataTransfer.effectAllowed='copy'; row.classList.add('dragging'); });
     row.addEventListener('dragend', () => row.classList.remove('dragging'));
   });

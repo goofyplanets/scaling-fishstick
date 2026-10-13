@@ -85,3 +85,108 @@ html.android-app .player .right-controls { display:none !important; }
  html.android-app .player .control-row { flex-basis:30px; height:30px; }
  html.android-app .player .seek { display:none !important; }
 }
+
+/* Fix drawer dismissal and use a Spotify-like compact mobile player. */
+html.android-app .mobile-sidebar-backdrop { display:none !important; }
+html.android-app body.mobile-sidebar-open::before { display:none !important; content:none !important; }
+html.android-app body.mobile-sidebar-open .mobile-sidebar-backdrop {
+  display:block !important; position:fixed !important; inset:0 !important;
+  z-index:40 !important; width:100vw !important; height:100dvh !important;
+  min-height:100vh !important; margin:0 !important; padding:0 !important;
+  border:0 !important; border-radius:0 !important; background:rgba(0,0,0,.64) !important;
+  backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+  cursor:pointer; touch-action:manipulation;
+}
+html.android-app body.mobile-sidebar-open .sidebar { z-index:50 !important; }
+@media (max-width:1000px) {
+  html.android-app { --player-h:88px; }
+  html.android-app .player {
+    position:fixed !important; inset:auto 0 0 0 !important; z-index:30 !important;
+    display:grid !important; grid-template-columns:minmax(0,1fr) auto !important;
+    grid-template-rows:minmax(0,1fr) !important; align-items:center !important;
+    gap:8px !important; width:100% !important; height:var(--player-h) !important;
+    min-height:var(--player-h) !important; box-sizing:border-box !important;
+    padding:7px 12px 15px !important; overflow:hidden !important;
+    background:linear-gradient(110deg,rgba(43,18,20,.99),rgba(24,13,15,.99)) !important;
+    border-top:1px solid rgba(224,61,79,.32) !important;
+    box-shadow:0 -9px 26px rgba(0,0,0,.34) !important;
+  }
+  html.android-app .player .now-playing {
+    grid-column:1 !important; grid-row:1 !important; display:flex !important;
+    width:100% !important; min-width:0 !important; min-height:0 !important;
+    align-items:center !important; gap:10px !important; overflow:hidden !important;
+  }
+  html.android-app .player .mini-cover {
+    display:grid !important; place-items:center !important; width:44px !important;
+    height:44px !important; flex:0 0 44px !important; overflow:hidden !important;
+    border-radius:6px !important; box-shadow:0 2px 10px rgba(0,0,0,.3) !important;
+  }
+  html.android-app .player .mini-cover img { width:100% !important; height:100% !important; object-fit:cover !important; }
+  html.android-app .player .np-text { flex:1 1 auto !important; min-width:0 !important; overflow:hidden !important; }
+  html.android-app .player .np-text b {
+    display:block !important; max-width:100% !important; overflow:hidden !important;
+    text-overflow:ellipsis !important; white-space:nowrap !important;
+    font-size:13px !important; font-weight:800 !important; line-height:1.35 !important;
+  }
+  html.android-app .player .np-text small {
+    display:block !important; max-width:100% !important; overflow:hidden !important;
+    text-overflow:ellipsis !important; white-space:nowrap !important;
+    margin-top:2px !important; font-size:11px !important; line-height:1.3 !important;
+  }
+  html.android-app .player .np-album, html.android-app .player .right-controls { display:none !important; }
+  html.android-app .player .controls {
+    grid-column:2 !important; grid-row:1 !important; display:flex !important;
+    flex-direction:row !important; align-items:center !important; justify-content:flex-end !important;
+    width:auto !important; min-width:0 !important; max-width:none !important;
+    height:auto !important; margin:0 !important; gap:0 !important;
+  }
+  html.android-app .player .control-row {
+    display:flex !important; flex-direction:row !important; align-items:center !important;
+    justify-content:flex-end !important; gap:6px !important; flex:0 0 auto !important;
+    width:auto !important; height:44px !important; min-height:44px !important;
+  }
+  html.android-app .player #shuffleBtn, html.android-app .player #repeatBtn { display:none !important; }
+  html.android-app .player #prevBtn, html.android-app .player #nextBtn {
+    display:grid !important; place-items:center !important; width:30px !important;
+    height:36px !important; min-width:30px !important; min-height:36px !important;
+    padding:0 !important; border-radius:8px !important; color:#f5e9eb !important; background:transparent !important;
+  }
+  html.android-app .player #prevBtn svg, html.android-app .player #nextBtn svg {
+    display:block !important; width:22px !important; height:22px !important; fill:currentColor !important; stroke:none !important;
+  }
+  html.android-app .player #playBtn {
+    display:grid !important; place-items:center !important; flex:0 0 40px !important;
+    width:40px !important; height:40px !important; min-width:40px !important; min-height:40px !important;
+    padding:0 !important; border-radius:50% !important; border:0 !important;
+    background:#fff !important; color:#160b0d !important; box-shadow:0 2px 8px rgba(0,0,0,.18) !important;
+  }
+  html.android-app .player #playBtn svg { width:19px !important; height:19px !important; fill:currentColor !important; }
+  html.android-app .player .seek {
+    position:absolute !important; left:12px !important; right:12px !important; bottom:5px !important;
+    display:flex !important; align-items:center !important; width:auto !important; height:3px !important;
+    min-height:3px !important; margin:0 !important; padding:0 !important; gap:0 !important;
+    overflow:visible !important; font-size:0 !important; line-height:0 !important;
+  }
+  html.android-app .player .seek span { display:none !important; }
+  html.android-app .player .seek input {
+    display:block !important; flex:1 1 auto !important; width:100% !important;
+    height:3px !important; min-height:3px !important; margin:0 !important; padding:0 !important;
+    border-radius:99px !important; touch-action:pan-x !important;
+  }
+}
+@media (max-width:380px) {
+  html.android-app { --player-h:84px; }
+  html.android-app .player { padding:6px 9px 14px !important; gap:5px !important; }
+  html.android-app .player .mini-cover { width:38px !important; height:38px !important; flex-basis:38px !important; }
+  html.android-app .player .now-playing { gap:8px !important; }
+  html.android-app .player .control-row { gap:3px !important; }
+  html.android-app .player #prevBtn, html.android-app .player #nextBtn { width:26px !important; min-width:26px !important; }
+  html.android-app .player #playBtn { width:36px !important; height:36px !important; min-width:36px !important; min-height:36px !important; flex-basis:36px !important; }
+  html.android-app .player .seek { left:9px !important; right:9px !important; }
+}
+@media (max-height:620px) {
+  html.android-app { --player-h:82px; }
+  html.android-app .player { padding-top:5px !important; padding-bottom:13px !important; }
+  html.android-app .player .mini-cover { width:36px !important; height:36px !important; flex-basis:36px !important; }
+  html.android-app .player #playBtn { width:34px !important; height:34px !important; min-width:34px !important; min-height:34px !important; flex-basis:34px !important; }
+}
