@@ -46,7 +46,7 @@ html.android-app .player .right-controls { display:none !important; }
  html.android-app body.mobile-search-open .main > .topbar > #mobileSearchToggle,
  html.android-app body.mobile-search-open .main > .topbar > .library-top-actions { display:none !important; }
  html.android-app body.mobile-search-open .main > .topbar > .search { display:flex !important; flex:1 1 auto; width:auto; min-width:0; }
- html.android-app body.mobile-search-open .main > .topbar .search-mode { display:none !important; }
+ html.android-app body.mobile-search-open .main > .topbar .search-mode { display:flex !important; flex:0 0 auto; }
  html.android-app body.mobile-search-open .main > .topbar .mobile-search-close { display:flex; }
  html.android-app body.mobile-search-open .main > .topbar .search-clear { width:22px; height:22px; }
  html.android-app body.mobile-sidebar-open::before { content:""; position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.62); backdrop-filter:blur(2px); }
