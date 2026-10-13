@@ -394,3 +394,20 @@ html .mobile-full-player { display:none !important; }
   html.android-app .player .np-text,
   html.android-app .player .mini-cover { touch-action:pan-y !important; }
 }
+
+
+/* Android-focused cleanup: no playlist UI, clearer download settings. */
+html.android-app #newPlaylistBtn,
+html.android-app #addPlaylistSide,
+html.android-app #homePlaylistGrid,
+html.android-app #playlistGrid,
+html.android-app #playlistsView,
+html.android-app #playlistDialog,
+html.android-app #editPlaylistDialog,
+html.android-app .side-section:has(#sidebarPlaylists),
+html.android-app .home-section-head:has(+ #homePlaylistGrid) { display:none !important; }
+html.android-app .download-folder-box { margin-top:12px; }
+html.android-app #settingsView .android-only-card .setting-row { align-items:flex-start; gap:14px; }
+html.android-app #settingsView .android-only-card .setting-row > div { flex:1 1 auto; min-width:0; }
+html.android-app #settingsView #settingAndroidDownloadMode { flex:0 1 220px; max-width:100%; }
+html.android-app #settingsView .android-only-card .provider-hint { line-height:1.55; }
