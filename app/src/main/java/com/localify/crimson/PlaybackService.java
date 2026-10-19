@@ -80,14 +80,17 @@ public class PlaybackService extends Service {
             playing = true; updateMetadata(intent); setSessionState(true);
             if (wakeLock != null && !wakeLock.isHeld()) wakeLock.acquire();
             startForeground(NOTIFICATION_ID, notification());
+            MusicWidgetProvider.updateAll(this, title, artist, artwork, playing);
         } else if (ACTION_PAUSED.equals(action)) {
             playing = false; updateMetadata(intent); setSessionState(false);
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
             stopForeground(STOP_FOREGROUND_DETACH);
             getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification());
+            MusicWidgetProvider.updateAll(this, title, artist, artwork, playing);
         } else if (ACTION_METADATA.equals(action)) {
             updateMetadata(intent); setSessionState(playing);
             getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification());
+            MusicWidgetProvider.updateAll(this, title, artist, artwork, playing);
         } else if (ACTION_PLAY.equals(action)) postAction("play-pause");
         else if (ACTION_PAUSE.equals(action)) postAction("play-pause");
         else if (ACTION_NEXT.equals(action)) postAction("next");
@@ -106,6 +109,7 @@ public class PlaybackService extends Service {
         if (title == null || title.isEmpty()) title = "Localify Crimson";
         if (artist == null) artist = ""; if (album == null) album = "";
         refreshSessionMetadata();
+        MusicWidgetProvider.updateAll(this, title, artist, artwork, playing);
         String key = (sourcePath == null ? "" : sourcePath) + "\u0000" + (coverUrl == null ? "" : coverUrl);
         if (key.equals(artworkKey)) return;
         artworkKey = key;
@@ -120,6 +124,7 @@ public class PlaybackService extends Service {
                 if (requestId != artworkRequestId) return;
                 artwork = bitmap;
                 refreshSessionMetadata();
+                MusicWidgetProvider.updateAll(PlaybackService.this, title, artist, artwork, playing);
                 try {
                     NotificationManager manager = getSystemService(NotificationManager.class);
                     if (manager != null) manager.notify(NOTIFICATION_ID, notification());
