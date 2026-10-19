@@ -2573,7 +2573,8 @@ function updateNowPlaying(t){
   const title = t?.title || 'Ничего не играет';
   const artist = t?.artist || 'Выберите трек';
   const album = t?.album || '';
-  const cover = coverHtml(t?.cover,'',t?.remoteCover || '') || uiIcon('music');
+  const appIconFallback = '<svg class="app-icon-fallback" viewBox="0 0 40 40" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block;border-radius:inherit"><rect x="1" y="1" width="38" height="38" rx="11" fill="#e01f2c"/><path d="M25.5 9.5v16.2a5.2 5.2 0 1 1-3.1-4.8V14l-8.7 2v12a5.2 5.2 0 1 1-3.1-4.8V13.5l14.9-4Z" fill="#fff"/><path d="M27.5 10.5v9" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/></svg>';
+  const cover = coverHtml(t?.cover,'',t?.remoteCover || '') || appIconFallback;
   $('#nowTitle').textContent=title; $('#nowArtist').textContent=artist; $('#nowAlbum').textContent=album; $('#miniCover').innerHTML=cover;
   const fullTitle=$('#mobileFullTitle'), fullArtist=$('#mobileFullArtist'), fullAlbum=$('#mobileFullAlbum'), fullCover=$('#mobileFullCover');
   if(fullTitle) fullTitle.textContent=title;
