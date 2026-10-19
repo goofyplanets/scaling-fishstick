@@ -64,8 +64,20 @@ public class LocalifyAndroidBridge {
     private String pendingAction = "";
     private volatile boolean scanCancelled = false;
     private final ExecutorService ytDlpExecutor = Executors.newFixedThreadPool(2);
+    private final ExecutorService libraryMetadataExecutor = Executors.newSingleThreadExecutor();
     private static volatile boolean ytDlpInitialized = false;
     private static final Object YT_DLP_INIT_LOCK = new Object();
+
+    private static final class PendingMetadata {
+        final Uri uri;
+        final String displayName;
+        final long modified;
+        PendingMetadata(Uri uri, String displayName, long modified) {
+            this.uri = uri;
+            this.displayName = displayName;
+            this.modified = modified;
+        }
+    }
 
     LocalifyAndroidBridge(MainActivity activity) {
         this.activity = activity;
@@ -217,11 +229,15 @@ public class LocalifyAndroidBridge {
                         return;
                     }
                     if ("chooseLibraryFolder".equals(action)) saveMusicFolder(tree.toString());
-                    JSONArray tracks = "chooseLibraryFolder".equals(action) ? scanTree(tree, 0, loadTrackCache()) : scanTree(tree, 0);
+                    List<PendingMetadata> pendingMetadata = new ArrayList<>();
+                    JSONArray tracks = "chooseLibraryFolder".equals(action)
+                        ? scanTree(tree, 0, loadTrackCache(), pendingMetadata)
+                        : scanTree(tree, 0);
                     if ("chooseLibraryFolder".equals(action)) {
                         JSONObject result = new JSONObject(); put(result, "folder", tree.toString()); put(result, "folderAvailable", true);
                         try { result.put("tracks", tracks); result.put("discoveredPlaylists", new JSONArray()); } catch (Exception ignored) {}
                         finishCallback(callback, result.toString(), null);
+                        scheduleMetadataEnrichment(pendingMetadata);
                     } else finishCallback(callback, tracks.toString(), null);
                 }
             } catch (Exception ex) {
@@ -261,10 +277,12 @@ public class LocalifyAndroidBridge {
         if (folder.isEmpty()) { finishCallback(callbackId, "null", null); return; }
         new Thread(() -> {
             try {
-                JSONArray tracks = scanTree(Uri.parse(folder), 0, loadTrackCache());
+                List<PendingMetadata> pendingMetadata = new ArrayList<>();
+                JSONArray tracks = scanTree(Uri.parse(folder), 0, loadTrackCache(), pendingMetadata);
                 JSONObject result = new JSONObject(); put(result, "folder", folder); put(result, "folderAvailable", true);
                 try { result.put("tracks", tracks); result.put("discoveredPlaylists", new JSONArray()); } catch (Exception ignored) {}
                 finishCallback(callbackId, result.toString(), null);
+                scheduleMetadataEnrichment(pendingMetadata);
             } catch (Exception e) {
                 JSONObject result = new JSONObject(); put(result, "folder", folder); put(result, "folderAvailable", false); put(result, "tracks", new JSONArray());
                 finishCallback(callbackId, result.toString(), e.getMessage());
@@ -287,20 +305,54 @@ public class LocalifyAndroidBridge {
     }
 
     private JSONArray scanTree(Uri treeUri, int depth) throws Exception {
-        return scanTree(treeUri, depth, null);
+        return scanTree(treeUri, depth, null, null);
     }
 
     private JSONArray scanTree(Uri treeUri, int depth, Map<String, JSONObject> cachedTracks) throws Exception {
+        return scanTree(treeUri, depth, cachedTracks, null);
+    }
+
+    private JSONArray scanTree(Uri treeUri, int depth, Map<String, JSONObject> cachedTracks, List<PendingMetadata> pendingMetadata) throws Exception {
         JSONArray tracks = new JSONArray();
         if (depth > 10 || tracks.length() > 15000) return tracks;
         String treeId = DocumentsContract.getTreeDocumentId(treeUri);
         Uri rootDoc = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId);
         boolean[] queryFailed = new boolean[]{false};
-        scanDocument(treeUri, rootDoc, depth, tracks, new HashSet<String>(), cachedTracks, queryFailed);
+        scanDocument(treeUri, rootDoc, depth, tracks, new HashSet<String>(), cachedTracks, queryFailed, pendingMetadata);
         if (queryFailed[0]) {
             throw new IOException("Не удалось полностью прочитать музыкальную папку. Проверьте доступ к папке или выберите её заново в настройках.");
         }
         return tracks;
+    }
+
+    private void scheduleMetadataEnrichment(List<PendingMetadata> pendingMetadata) {
+        if (pendingMetadata == null || pendingMetadata.isEmpty()) return;
+        final List<PendingMetadata> work = new ArrayList<>(pendingMetadata);
+        libraryMetadataExecutor.execute(() -> {
+            JSONArray batch = new JSONArray();
+            for (PendingMetadata pending : work) {
+                JSONObject enriched = null;
+                try {
+                    enriched = makeTrack(pending.uri, pending.displayName, pending.modified);
+                    if (enriched != null) {
+                        try { enriched.remove("_metadataPending"); } catch (Exception ignored) {}
+                        batch.put(enriched);
+                    }
+                } catch (Exception error) {
+                    Log.w(TAG, "Metadata enrichment failed for " + pending.uri, error);
+                }
+                if (batch.length() >= 12) {
+                    dispatchMetadataBatch(batch);
+                    batch = new JSONArray();
+                }
+            }
+            dispatchMetadataBatch(batch);
+        });
+    }
+
+    private void dispatchMetadataBatch(JSONArray batch) {
+        if (batch == null || batch.length() == 0) return;
+        activity.eval("if(window.__localifyAndroidEnrichedTracks){window.__localifyAndroidEnrichedTracks(" + batch.toString() + ");}");
     }
 
     /**
@@ -352,24 +404,14 @@ public class LocalifyAndroidBridge {
         return null;
     }
 
-    private void scanDocument(Uri treeUri, Uri docUri, int depth, JSONArray out, Set<String> visited, Map<String, JSONObject> cachedTracks, boolean[] queryFailed) {
+    private void scanDocument(Uri treeUri, Uri docUri, int depth, JSONArray out, Set<String> visited, Map<String, JSONObject> cachedTracks, boolean[] queryFailed, List<PendingMetadata> pendingMetadata) {
         if (depth > 10 || out.length() >= 15000) return;
         String docId;
         try { docId = DocumentsContract.getDocumentId(docUri); } catch (Exception e) { return; }
         if (!visited.add(docId)) return;
         ContentResolver resolver = activity.getContentResolver();
-        try (Cursor cursor = queryDocumentColumns(docUri, queryFailed)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                String display = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
-                String mime = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
-                if (!DocumentsContract.Document.MIME_TYPE_DIR.equals(mime) && isAudio(display, mime)) {
-                    int modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
-                    long modified = modifiedIndex >= 0 ? cursor.getLong(modifiedIndex) : 0;
-                    JSONObject track = cachedTrack(docUri, display, modified, cachedTracks);
-                    if (track != null) out.put(track);
-                }
-            }
-        } catch (Exception ignored) {}
+        // Every call here represents a directory (the root or a directory discovered
+        // in its parent cursor), so querying that same document again is redundant.
         try {
             Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId);
             try (Cursor cursor = queryDocumentColumns(children, queryFailed)) {
@@ -379,11 +421,11 @@ public class LocalifyAndroidBridge {
                     String display = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
                     String mime = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
                     Uri child = DocumentsContract.buildDocumentUriUsingTree(treeUri, childId);
-                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) scanDocument(treeUri, child, depth + 1, out, visited, cachedTracks, queryFailed);
+                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) scanDocument(treeUri, child, depth + 1, out, visited, cachedTracks, queryFailed, pendingMetadata);
                     else if (isAudio(display, mime)) {
                         int modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
                         long modified = modifiedIndex >= 0 ? cursor.getLong(modifiedIndex) : 0;
-                        JSONObject track = cachedTrack(child, display, modified, cachedTracks);
+                        JSONObject track = cachedTrack(child, display, modified, cachedTracks, pendingMetadata);
                         if (track != null) out.put(track);
                     }
                 }
@@ -391,10 +433,28 @@ public class LocalifyAndroidBridge {
         } catch (Exception ignored) {}
     }
 
-    private JSONObject cachedTrack(Uri uri, String display, long modified, Map<String, JSONObject> cachedTracks) {
+    private JSONObject cachedTrack(Uri uri, String display, long modified, Map<String, JSONObject> cachedTracks, List<PendingMetadata> pendingMetadata) {
         JSONObject cached = cachedTracks == null ? null : cachedTracks.get(uri.toString());
-        if (cached != null && modified > 0 && Long.toString(modified).equals(cached.optString("_statKey", ""))) {
+        boolean cachedPending = cached != null && cached.optBoolean("_metadataPending", false);
+        boolean sameRevision = cached != null && (modified <= 0 || Long.toString(modified).equals(cached.optString("_statKey", "")));
+
+        // Some SAF providers omit LAST_MODIFIED. Reuse known metadata instead of
+        // decoding every audio file again on every app start.
+        if (cached != null && !cachedPending && sameRevision) {
             try { return new JSONObject(cached.toString()); } catch (Exception ignored) {}
+        }
+
+        if (pendingMetadata != null) {
+            if (cached != null && cachedPending && sameRevision) {
+                pendingMetadata.add(new PendingMetadata(uri, display, modified));
+                try { return new JSONObject(cached.toString()); } catch (Exception ignored) {}
+            }
+            JSONObject basic = makeBasicTrack(uri, display, modified);
+            if (basic != null) {
+                put(basic, "_metadataPending", true);
+                pendingMetadata.add(new PendingMetadata(uri, display, modified));
+            }
+            return basic;
         }
         return makeTrack(uri, display, modified);
     }
