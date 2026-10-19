@@ -409,7 +409,6 @@ public class LocalifyAndroidBridge {
         String docId;
         try { docId = DocumentsContract.getDocumentId(docUri); } catch (Exception e) { return; }
         if (!visited.add(docId)) return;
-        ContentResolver resolver = activity.getContentResolver();
         // Every call here represents a directory (the root or a directory discovered
         // in its parent cursor), so querying that same document again is redundant.
         try {
