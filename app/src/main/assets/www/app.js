@@ -1407,14 +1407,9 @@ let androidMetadataUpdatedSinceRender = 0;
 window.__localifyAndroidEnrichedTracks = function(tracks) {
   if (!window.__LOCALIFY_ANDROID__ || !Array.isArray(tracks) || !tracks.length) return;
   let changed = 0;
-  const byPath = new Map();
-  for (const track of state.library) {
-    const key = normalizeFsPath(track?.sourcePath || track?.path || '');
-    if (key) byPath.set(key, track);
-  }
   for (const incoming of tracks) {
     const key = normalizeFsPath(incoming?.sourcePath || incoming?.path || '');
-    const current = key ? byPath.get(key) : null;
+    const current = key ? state.trackByPath.get(key) : null;
     if (!current) continue; // Ignore callbacks from an old folder or a removed track.
     const stableId = current.id;
     const addedAt = current.addedAt;
