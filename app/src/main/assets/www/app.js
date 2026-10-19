@@ -631,7 +631,7 @@ async function init() {
   save();
   restorePlaybackSession();
   setTimeout(() => { void syncConfiguredLibrary(false, { fastStart: true }); }, 50);
-  if(state.settings.onlineMetadata) setTimeout(() => scheduleMetadataHydration(true), 1200);
+  if(state.settings.onlineMetadata && !window.__LOCALIFY_ANDROID__) setTimeout(() => scheduleMetadataHydration(true), 1200);
   setTimeout(() => refreshProviderDiagnostics(false), 700);
 }
 
@@ -1402,6 +1402,45 @@ async function applyLibraryScanResult(result, notify=true){
   if(added && state.settings.onlineMetadata) setTimeout(() => scheduleMetadataHydration(true), 200);
 }
 
+window.__localifyAndroidEnrichedTracks = function(tracks) {
+  if (!window.__LOCALIFY_ANDROID__ || !Array.isArray(tracks) || !tracks.length) return;
+  let changed = 0;
+  const byPath = new Map();
+  for (const track of state.library) {
+    const key = normalizeFsPath(track?.sourcePath || track?.path || '');
+    if (key) byPath.set(key, track);
+  }
+  for (const incoming of tracks) {
+    const key = normalizeFsPath(incoming?.sourcePath || incoming?.path || '');
+    const current = key ? byPath.get(key) : null;
+    if (!current) continue; // Ignore callbacks from an old folder or a removed track.
+    const stableId = current.id;
+    const addedAt = current.addedAt;
+    const manual = current.metadataOverride === true
+      ? { title: current.title, artist: current.artist, album: current.album, year: current.year }
+      : null;
+    mergeTrackData(current, incoming);
+    current.id = stableId;
+    current.addedAt = addedAt || current.addedAt || Date.now();
+    delete current._metadataPending;
+    if (manual) {
+      Object.assign(current, manual);
+      current.metadataSource = 'manual';
+      current.metadataOverride = true;
+    }
+    if (incoming._statKey) {
+      current.metadataCheckedAt = Date.now();
+      current.metadataStatKey = incoming._statKey;
+    }
+    indexTrack(current, state.indexById.get(current.id));
+    changed++;
+  }
+  if (changed) {
+    save();
+    if (['library', 'home', 'playlists'].includes(state.currentView)) renderCurrentView();
+  }
+};
+
 function normalizeFsPath(p) { return String(p || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase(); }
 async function applyLibraryChangeResult(result, notify = false, persist = true) {
   if (!result || result.fullScan) return applyLibraryScanResult(result, notify);
@@ -1532,7 +1571,7 @@ async function syncConfiguredLibrary(notify = true, change = null) {
     console.error('Library sync failed:', err);
     if (notify || window.__LOCALIFY_ANDROID__) toast(String(err?.message || 'Не удалось обновить библиотеку'));
   }
-  finally { state.syncingLibrary = false; if (!state.scanProgress) updateLibraryScanProgress({ phase: 'done', done: state.library.length, total: state.library.length }); }
+  finally { state.syncingLibrary = false; updateLibraryScanProgress({ phase: 'done', done: state.library.length, total: state.library.length }); }
 }
 async function refreshTrackMetadata(id) {
   const track=findTrackById(id); if(!track)return; const filePath=track.path||track.sourcePath||''; if(!filePath){toast('У трека нет пути к файлу');return;}
@@ -1542,13 +1581,14 @@ async function refreshTrackMetadata(id) {
 }
 const metadataPipeline = new window.LocalifyMetadataPipeline({
   getTracks: () => state.library,
-  isEnabled: () => state.settings.onlineMetadata !== false,
+  isEnabled: () => state.settings.onlineMetadata !== false && !window.__LOCALIFY_ANDROID__,
   search: track => window.localify.metadata.search(track),
   save,
   render: () => { if(['library','home','playlists'].includes(state.currentView)) renderCurrentView(); },
   status: () => {
     const el = $('#metadataQueueStatus');
     if (!el) return;
+    if (window.__LOCALIFY_ANDROID__) { el.textContent = 'Читаю теги непосредственно из аудиофайлов'; return; }
     if (!state.settings.onlineMetadata) { el.textContent = 'Онлайн-обогащение отключено'; return; }
     if (metadataPipeline.running) { el.textContent = `Обработка метаданных: ${metadataPipeline.done}/${metadataPipeline.total}`; return; }
     el.textContent = metadataPipeline.total ? `Готово: ${metadataPipeline.done}/${metadataPipeline.total}` : 'Очередь метаданных пуста';
