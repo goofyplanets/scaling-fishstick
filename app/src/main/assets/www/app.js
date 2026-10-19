@@ -1402,6 +1402,8 @@ async function applyLibraryScanResult(result, notify=true){
   if(added && state.settings.onlineMetadata) setTimeout(() => scheduleMetadataHydration(true), 200);
 }
 
+let androidMetadataRenderTimer = null;
+let androidMetadataUpdatedSinceRender = 0;
 window.__localifyAndroidEnrichedTracks = function(tracks) {
   if (!window.__LOCALIFY_ANDROID__ || !Array.isArray(tracks) || !tracks.length) return;
   let changed = 0;
@@ -1436,8 +1438,16 @@ window.__localifyAndroidEnrichedTracks = function(tracks) {
     changed++;
   }
   if (changed) {
+    androidMetadataUpdatedSinceRender += changed;
     save();
-    if (['library', 'home', 'playlists'].includes(state.currentView)) renderCurrentView();
+    // Coalesce frequent metadata batches to avoid repeatedly rendering a huge library.
+    if (!androidMetadataRenderTimer) {
+      androidMetadataRenderTimer = setTimeout(() => {
+        androidMetadataRenderTimer = null;
+        androidMetadataUpdatedSinceRender = 0;
+        if (['library', 'home', 'playlists'].includes(state.currentView)) renderCurrentView();
+      }, 2200);
+    }
   }
 };
 
