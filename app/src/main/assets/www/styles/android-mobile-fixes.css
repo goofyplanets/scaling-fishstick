@@ -420,3 +420,163 @@ html.android-app [data-action*="playlist"] { display:none !important; }
 html.android-app .brand-mark svg { display:block; width:100%; height:100%; }
 html.android-app .nav-item .nav-icon { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 html.android-app .nav-item.active .nav-icon { filter:drop-shadow(0 0 4px rgba(224,31,44,.28)); }
+
+
+/* Responsive phone pass: keep content usable from narrow 320px devices to large phones,
+   while respecting Android display cutouts, gesture areas and the software keyboard. */
+html.android-app,
+html.android-app body {
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  min-height:100%;
+  overflow-x:clip;
+  -webkit-text-size-adjust:100%;
+}
+html.android-app *,
+html.android-app *::before,
+html.android-app *::after { box-sizing:border-box; }
+html.android-app .app-shell,
+html.android-app .main,
+html.android-app .content,
+html.android-app .view,
+html.android-app .active-view { min-width:0; max-width:100%; }
+html.android-app .view {
+  padding-left:clamp(12px,3.6vw,22px) !important;
+  padding-right:clamp(12px,3.6vw,22px) !important;
+  padding-bottom:calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+  overflow-wrap:anywhere;
+}
+html.android-app .section-head,
+html.android-app .page-head {
+  min-width:0;
+  gap:12px;
+}
+html.android-app .section-head h1,
+html.android-app .page-head h1,
+html.android-app .hero h1 {
+  max-width:100%;
+  overflow-wrap:anywhere;
+  font-size:clamp(25px,6.8vw,38px);
+  line-height:1.12;
+}
+html.android-app .page-actions,
+html.android-app .hero-actions,
+html.android-app .folder-actions {
+  min-width:0;
+  max-width:100%;
+  flex-wrap:wrap;
+}
+html.android-app .settings-grid {
+  grid-template-columns:minmax(0,1fr) !important;
+  min-width:0;
+}
+html.android-app .settings-card {
+  min-width:0;
+  max-width:100%;
+  padding:clamp(12px,3.5vw,18px);
+  overflow-wrap:anywhere;
+}
+html.android-app .setting-row {
+  min-width:0;
+  gap:12px;
+  align-items:flex-start;
+}
+html.android-app .setting-row > div,
+html.android-app .settings-card-head,
+html.android-app .settings-card-head > div {
+  min-width:0;
+  max-width:100%;
+}
+html.android-app .setting-row select,
+html.android-app .setting-row input:not([type="checkbox"]):not([type="range"]),
+html.android-app .settings-card select,
+html.android-app .settings-card input:not([type="checkbox"]):not([type="range"]),
+html.android-app .settings-card textarea {
+  min-width:0;
+  max-width:100%;
+}
+html.android-app .album-grid {
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:clamp(8px,2.5vw,14px);
+}
+html.android-app .album-card,
+html.android-app .album-card-copy,
+html.android-app .album-cover {
+  min-width:0;
+  max-width:100%;
+}
+html.android-app .modal,
+html.android-app dialog.modal {
+  width:calc(100vw - 24px);
+  max-width:calc(100vw - 24px);
+  max-height:calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px);
+  margin:auto;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+html.android-app .modal form,
+html.android-app .modal label,
+html.android-app .modal input,
+html.android-app .modal select,
+html.android-app .modal textarea {
+  min-width:0;
+  max-width:100%;
+}
+html.android-app input,
+html.android-app select,
+html.android-app textarea,
+html.android-app button {
+  max-width:100%;
+  scroll-margin-block:12px;
+}
+html.android-app .mobile-full-player {
+  padding-top:calc(12px + env(safe-area-inset-top, 0px));
+  padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+  min-width:0;
+  max-width:100vw;
+  overflow-x:hidden;
+}
+html.android-app .mobile-full-track-info,
+html.android-app .mobile-full-track-text,
+html.android-app .mobile-full-context,
+html.android-app .mobile-full-bottom { min-width:0; }
+html.android-app .mobile-full-track-text b,
+html.android-app .mobile-full-track-text small,
+html.android-app .mobile-full-context b {
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+html.android-app .mobile-full-cover {
+  max-width:min(76vw, 360px, 38dvh);
+  max-height:38dvh;
+  aspect-ratio:1;
+}
+@media (max-width:360px) {
+  html.android-app .main > .topbar {
+    grid-template-columns:36px minmax(0,1fr) 36px !important;
+    padding-left:8px !important;
+    padding-right:8px !important;
+  }
+  html.android-app .mobile-top-icon {
+    width:36px !important;
+    min-width:36px !important;
+    flex-basis:36px !important;
+    height:36px !important;
+    min-height:36px !important;
+  }
+  html.android-app .track-title b { font-size:12px !important; }
+  html.android-app .track-title small { font-size:10px !important; }
+  html.android-app .settings-card-head h3,
+  html.android-app .settings-card h3 { font-size:15px; }
+  html.android-app .setting-row { gap:8px; }
+  html.android-app .setting-row b { overflow-wrap:anywhere; }
+  html.android-app .mobile-full-cover { max-width:68vw; max-height:32dvh; }
+}
+@media (max-height:560px) and (max-width:1000px) {
+  html.android-app .mobile-full-player { overflow-y:auto; }
+  html.android-app .mobile-full-art-area { min-height:0; padding:8px 0; }
+  html.android-app .mobile-full-cover { max-height:28dvh; max-width:min(42vw, 240px); }
+}
